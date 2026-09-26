@@ -1,11 +1,11 @@
 {
   "name": "@pascapone/dsh-task-master",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "DSH Task Master: live sessions, managed tasks and listening processes with honest ownership and guarded stop controls.",
   "repository": { "type": "git", "url": "https://github.com/Pascapone/dsh-task-master.git" },
-  "scripts": { "test": "node test.mjs" },
+  "scripts": { "test": "node test.mjs && node client.test.mjs" },
   "exports": { ".": "./index.js", "./client": "./client.js" },
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },

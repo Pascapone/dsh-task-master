@@ -81,18 +81,20 @@ async function scanWindows() {
 
 function inventory(ctx, sessions, scan) {
   const workspaces = ctx.workspaceRegistry.list();
+  const archivedIds = new Set(ctx.workspaceRegistry.archivedSessionIds ?? []);
   const byPid = new Map(scan.processes.map(process => [process.pid, process]));
   const workspaceOf = id => workspaces.find(workspace => workspace.sessionIds.includes(id));
   const rows = [];
   const ownedPids = new Map();
-  const active = [];
+  const sessionRows = [];
   for (const session of sessions) {
     const agent = ctx.agents.get(session.sessionId);
     const jobs = ctx.get('jobs')?.list(session.sessionId).filter(job => job.owner === session.sessionId && (job.status === 'running' || job.status === 'stopping')) ?? [];
     const terminals = agent ? (ctx.get('terminals')?.list(agent) ?? []).filter(terminal => terminal.status.kind === 'running') : [];
     const browser = agent ? (ctx.get('terminalController')?.list(session.sessionId) ?? []).filter(terminal => terminal.state === 'running') : [];
-    if (agent || jobs.length || terminals.length || browser.length) active.push({
+    sessionRows.push({
       id: session.sessionId, running: session.running, available: !!agent,
+      archived: archivedIds.has(session.sessionId),
       workspace: workspaceOf(session.sessionId)?.title ?? session.cwd ?? null,
       jobs: jobs.map(job => ({ id: job.id, label: job.label, status: job.status })),
       terminals: [
@@ -121,7 +123,7 @@ function inventory(ctx, sessions, scan) {
     });
   }
   rows.sort((left, right) => left.ports[0].localeCompare(right.ports[0], undefined, { numeric: true }));
-  return { sessions: active, processes: rows, scannedAt: Date.now() };
+  return { sessions: sessionRows, processes: rows, scannedAt: Date.now() };
 }
 
 async function stop(ctx, input) {

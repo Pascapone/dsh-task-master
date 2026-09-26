@@ -33,9 +33,13 @@ let killed;
 const job = { id: 'bash-1', label: 'dev server', status: 'running', owner: 's1' };
 apply({
   connection: { fetch: { register: value => { route = value; return () => {}; } } },
-  sessionController: { list: async () => ({ items: [{ sessionId: 's1', cwd: 'C:\\Projects\\alpha', running: false }] }) },
-  workspaceRegistry: { list: () => [{ id: 'w1', title: 'Alpha', path: 'C:\\Projects\\alpha', sessionIds: ['s1'] }] },
-  agents: { get: () => ({ status: 'idle' }), list: () => [] },
+  sessionController: { list: async () => ({ items: [
+    { sessionId: 's1', cwd: 'C:\\Projects\\alpha', running: false },
+    { sessionId: 's2', cwd: 'C:\\Projects\\alpha', running: false },
+    { sessionId: 's3', cwd: 'C:\\Projects\\alpha', running: false },
+  ] }) },
+  workspaceRegistry: { archivedSessionIds: ['s2'], list: () => [{ id: 'w1', title: 'Alpha', path: 'C:\\Projects\\alpha', sessionIds: ['s1', 's2', 's3'] }] },
+  agents: { get: id => id === 's1' ? { status: 'idle' } : undefined, list: () => [] },
   get: key => key === 'jobs' ? { list: () => [job], kill: (...args) => { killed = args; return 'requested'; } } : undefined,
   effect: register => register(),
 });
@@ -45,6 +49,14 @@ const inventory = await snapshot.json();
 assert.equal(snapshot.status, 200, inventory.error);
 assert.equal(inventory.sessions[0].id, 's1');
 assert.equal(inventory.sessions[0].jobs[0].id, 'bash-1');
+assert.equal(inventory.sessions[0].archived, false);
+assert.equal(inventory.sessions[1].id, 's2');
+assert.equal(inventory.sessions[1].archived, true);
+assert.equal(inventory.sessions[1].jobs.length, 0);
+assert.equal(inventory.sessions.length, 3); // include non-archived inactive history for All/Search filters
+assert.equal(inventory.sessions[2].id, 's3');
+assert.equal(inventory.sessions[2].archived, false);
+assert.equal(inventory.sessions[2].available, false);
 assert.ok(Array.isArray(inventory.processes));
 const response = await route.fetch(new Request('http://localhost/api/dsh-task-master', { method: 'POST', body: JSON.stringify({ kind: 'job', sessionId: 's1', id: 'bash-1' }) }));
 assert.equal(response.status, 200);

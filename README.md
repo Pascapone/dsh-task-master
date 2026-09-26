@@ -1,6 +1,6 @@
 # DSH Task Master
 
-A compact Windows task-manager tab for DeepSeek Harness Web. The sidebar opens a live overview of active Sessions, DSH-managed jobs and terminals, and processes listening on TCP ports.
+A compact Windows task-manager tab for DeepSeek Harness Web. The sidebar opens two focused views: **Sessions** with DSH-managed jobs and terminals, and **Processes** with TCP listeners. The Sessions view supports workspace/Session search, All/Running/Idle/Inactive status, activity filtering (running turns or managed tasks), and an archived-Session toggle. Archived Sessions are hidden by default; the toggle only changes what is displayed, never the underlying DSH archive.
 
 Ownership is shown as **confirmed**, **suspected**, or **unknown**. Confirmed means DSH owns the task or exact terminal process. Suspected means a process command line or executable path mentions one registered Workspace; it does **not** establish Session ownership. Unknown means no supported attribution was found. Only TCP listeners are included in the OS process list; a process without a listening port may still be running.
 
@@ -22,4 +22,4 @@ Use your own profile name in place of `web`. The package is `@pascapone/dsh-task
 - A confirmation is required before stopping. An unknown or suspected listener could belong to another application; inspect it before confirming. Browser access to this route inherits DSH's operator-level authentication, not separate per-user OS-process permissions. Do not expose the Web UI to untrusted operators.
 - Process discovery requires Windows PowerShell (`Get-CimInstance`, `Get-NetTCPConnection`) and permission to inspect the relevant processes. It cannot reconstruct every detached process's original DSH Session after the fact.
 
-Run `node test.mjs` to exercise attribution, the Host endpoint, and (on Windows) a temporary, test-owned TCP server with process-identity-checked termination. The test never targets existing applications.
+Run `npm test` to exercise the Client's tabs and filters, Host attribution and endpoint, and (on Windows) a temporary, test-owned TCP server with process-identity-checked termination. The test never targets existing applications.

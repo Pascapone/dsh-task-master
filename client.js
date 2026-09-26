@@ -5,29 +5,55 @@ window.__ModuleLoader__.load({
     const h = React.createElement;
     const URL = 'api/dsh-task-master';
     const CSS = `
-.dtm{height:100%;overflow:auto;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:13px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;container-type:inline-size}
-.dtm *{box-sizing:border-box}.dtm-inner{max-width:1240px;margin:auto;padding:30px 32px 68px}
-.dtm-top{display:flex;justify-content:space-between;gap:18px;align-items:start;padding-bottom:25px;border-bottom:.5px solid var(--dsw-alias-border-l3)}
-.dtm-eyebrow{display:flex;align-items:center;gap:9px;color:var(--dsw-alias-label-tertiary);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
-.dtm-live{width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-state-success-primary);box-shadow:0 0 0 3px var(--dsw-alias-bg-layer-2)}
-.dtm h1{font-size:25px;line-height:1.2;letter-spacing:-.035em;margin:11px 0 6px;font-weight:680}.dtm-sub{color:var(--dsw-alias-label-secondary);margin:0;max-width:580px}
-.dtm-action,.dtm-filter,.dtm-stop{font:inherit;border:0;cursor:pointer;color:var(--dsw-alias-label-primary)}.dtm-action{background:var(--dsw-alias-bg-layer-1);box-shadow:var(--dsw-elevation-soft);padding:8px 13px;border-radius:10px;white-space:nowrap}.dtm-action:hover,.dtm-stop:hover{background:var(--dsw-alias-interactive-bg-hover)}
-.dtm-action:disabled,.dtm-stop:disabled{cursor:not-allowed;opacity:.42}.dtm :is(button):focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
-.dtm-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:23px 0 29px}.dtm-stat{background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l3);border-radius:14px;padding:15px 18px}.dtm-stat strong{display:block;font-size:25px;letter-spacing:-.04em;line-height:1.2;font-variant-numeric:tabular-nums}.dtm-stat span{color:var(--dsw-alias-label-secondary);font-size:11px;letter-spacing:.02em}
-.dtm-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:28px 0 11px}.dtm-heading h2{margin:0;font-size:15px;font-weight:650;letter-spacing:-.02em}.dtm-count{font-size:11px;color:var(--dsw-alias-label-tertiary)}
-.dtm-list{background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l3);border-radius:14px;overflow:hidden}.dtm-row{display:flex;align-items:center;gap:14px;min-height:63px;padding:12px 16px;border-top:.5px solid var(--dsw-alias-border-l3)}.dtm-row:first-child{border-top:0}.dtm-identity{min-width:0;flex:1}.dtm-name{font-weight:590;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dtm-detail{font-size:11px;color:var(--dsw-alias-label-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dtm-meta{min-width:118px;text-align:right}.dtm-port{font:12px/1.5 'SF Mono',Consolas,monospace;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums}.dtm-tag{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:11px;font-weight:560}.dtm-tag:before{content:'';width:6px;height:6px;background:currentColor;border-radius:50%}.dtm-tag.confirmed{color:var(--dsw-alias-state-success-primary)}.dtm-tag.suspected{color:var(--dsw-alias-state-warn-primary)}.dtm-tag.unknown{color:var(--dsw-alias-label-tertiary)}
-.dtm-stop{border-radius:8px;padding:7px 9px;white-space:nowrap;background:var(--dsw-alias-bg-layer-2);min-width:68px}.dtm-stop.danger{color:var(--dsw-alias-state-error-primary)}.dtm-stop.danger:hover{background:var(--dsw-alias-interactive-bg-hover-danger)}
-.dtm-session{padding:14px 16px;border-top:.5px solid var(--dsw-alias-border-l3)}.dtm-session:first-child{border-top:0}.dtm-session-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.dtm-session-name{font-weight:620;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dtm-resources{padding:9px 0 0 12px;margin:10px 0 0 3px;border-left:1px solid var(--dsw-alias-border-l3)}.dtm-resource{display:flex;align-items:center;gap:12px;min-height:35px}.dtm-resource .dtm-detail{flex:1}.dtm-resource .dtm-stop{font-size:11px;padding:5px 9px}.dtm-pid{font:11px Consolas,monospace;color:var(--dsw-alias-label-tertiary)}
-.dtm-filters{display:flex;gap:4px;overflow:auto;padding:3px 0 10px}.dtm-filter{white-space:nowrap;border-radius:8px;padding:6px 10px;background:transparent;color:var(--dsw-alias-label-secondary)}.dtm-filter:hover{background:var(--dsw-alias-interactive-bg-hover)}.dtm-filter[aria-pressed=true]{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
-.dtm-empty{color:var(--dsw-alias-label-secondary);padding:23px 16px}.dtm-notice{padding:11px 14px;border-radius:10px;margin:16px 0 0;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);border:.5px solid var(--dsw-alias-border-l3)}.dtm-notice.error{color:var(--dsw-alias-state-error-primary)}.dtm-foot{color:var(--dsw-alias-label-tertiary);font-size:11px;margin-top:17px}
-@container (max-width:700px){.dtm-inner{padding:18px 16px 48px}.dtm-stats{gap:7px}.dtm-stat{padding:12px}.dtm-stat strong{font-size:20px}.dtm-row{flex-wrap:wrap;gap:7px 11px}.dtm-identity{flex-basis:calc(100% - 86px)}.dtm-meta{order:3;flex:1;text-align:left}.dtm-row>.dtm-stop{order:2}.dtm-session-head{flex-wrap:wrap}.dtm h1{font-size:22px}}
-@container (max-width:400px){.dtm-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.dtm-stat span{font-size:10px}.dtm-top{align-items:center}.dtm-action{padding:7px 9px}.dtm-sub{font-size:12px}}
+.dtm{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;container-type:inline-size;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:13px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.dtm *{box-sizing:border-box}.dtm button,.dtm input{font:inherit}.dtm button{cursor:pointer}.dtm button:disabled{opacity:.45;cursor:not-allowed}.dtm :is(button,input,[tabindex]):focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
+.dtm-head{flex:none;background:var(--dsw-alias-bg-base);border-bottom:1px solid var(--dsw-alias-border-l3)}
+.dtm-toolbar{min-height:36px;padding:3px 10px;display:flex;align-items:center;gap:10px}.dtm-title{font-size:14px;font-weight:620;white-space:nowrap;letter-spacing:-.01em}.dtm-spacer{flex:1}.dtm-time{color:var(--dsw-alias-label-tertiary);font-size:11px;white-space:nowrap}
+.dtm-refresh{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font-size:17px!important;line-height:1}.dtm-refresh:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.dtm-tabs{display:flex;align-items:end;gap:19px;padding:0 10px;overflow-x:auto;scrollbar-width:thin}.dtm-tab{flex:none;display:flex;align-items:center;gap:6px;min-height:34px;padding:6px 2px 7px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--dsw-alias-label-secondary);white-space:nowrap}.dtm-tab:hover{color:var(--dsw-alias-label-primary)}.dtm-tab[aria-selected=true]{color:var(--dsw-alias-label-primary);border-bottom-color:var(--dsw-alias-state-business-primary)}.dtm-tab-count{font-size:11px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}
+.dtm-panel{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}.dtm-panel[hidden]{display:none}
+.dtm-controls{position:sticky;top:0;z-index:2;display:flex;align-items:center;flex-wrap:wrap;gap:5px 14px;min-height:38px;padding:4px 10px;background:var(--dsw-alias-bg-base);border-bottom:1px solid var(--dsw-alias-border-l3)}
+.dtm-search{flex:0 1 190px;min-width:115px;height:27px;padding:3px 8px;border:1px solid var(--dsw-alias-border-l3);border-radius:6px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);outline:none}.dtm-search::placeholder{color:var(--dsw-alias-label-tertiary)}
+.dtm-segment{display:flex;align-items:center;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:none}.dtm-segment::-webkit-scrollbar{display:none}.dtm-chip{flex:none;min-height:26px;padding:3px 7px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--dsw-alias-label-secondary);white-space:nowrap}.dtm-chip:hover{background:var(--dsw-alias-interactive-bg-hover)}.dtm-chip[aria-pressed=true]{border-color:var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}.dtm-chip-count{font-size:11px;color:var(--dsw-alias-label-tertiary)}
+.dtm-check{display:inline-flex;align-items:center;gap:5px;min-height:27px;color:var(--dsw-alias-label-secondary);white-space:nowrap;cursor:pointer}.dtm-check input{width:14px;height:14px;margin:0;accent-color:var(--dsw-alias-state-business-primary)}.dtm-filter-count{margin-left:auto;color:var(--dsw-alias-label-tertiary);font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.dtm-session,.dtm-process{border-bottom:1px solid var(--dsw-alias-border-l3)}.dtm-session-main,.dtm-process-main{display:flex;align-items:center;gap:9px;min-height:37px;padding:4px 10px}.dtm-session-main:hover,.dtm-process-main:hover,.dtm-resource:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.dtm-identity{display:flex;align-items:baseline;gap:8px;flex:1;min-width:0}.dtm-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:550}.dtm-id,.dtm-pid{flex:none;color:var(--dsw-alias-label-tertiary);font:11px/1.4 'SF Mono',Consolas,monospace;white-space:nowrap}.dtm-identity .dtm-id{font-size:11px}
+.dtm-state{display:inline-flex;align-items:center;gap:6px;flex:none;min-width:67px;color:var(--dsw-alias-label-secondary);font-size:11px;white-space:nowrap}.dtm-state:before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}.dtm-state.running,.dtm-state.confirmed{color:var(--dsw-alias-state-success-primary)}.dtm-state.suspected{color:var(--dsw-alias-state-warn-primary)}.dtm-state.archived,.dtm-state.inactive,.dtm-state.unknown{color:var(--dsw-alias-label-tertiary)}
+.dtm-task-count{flex:none;color:var(--dsw-alias-label-tertiary);font-size:11px;min-width:38px;text-align:right}.dtm-task-count:empty{min-width:38px}.dtm-stop{flex:none;min-width:55px;min-height:26px;padding:3px 7px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);text-align:center;white-space:nowrap}.dtm-stop:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.dtm-stop.danger:hover{color:var(--dsw-alias-state-error-primary)}
+.dtm-resource{display:flex;align-items:center;gap:9px;min-height:30px;padding:2px 10px 2px 27px}.dtm-resource-type{width:66px;flex:none;color:var(--dsw-alias-label-tertiary);font-size:11px}.dtm-resource-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dtm-resource .dtm-stop{min-height:24px;font-size:11px}
+.dtm-port{flex:none;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:11px/1.5 'SF Mono',Consolas,monospace;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}.dtm-process .dtm-state{min-width:78px}.dtm-workspace{flex:0 1 150px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary);font-size:11px}
+.dtm-empty{padding:17px 10px;color:var(--dsw-alias-label-secondary)}.dtm-notice{padding:8px 10px;border-bottom:1px solid var(--dsw-alias-border-l3);color:var(--dsw-alias-label-secondary);font-size:11px}.dtm-notice.error{color:var(--dsw-alias-state-error-primary)}
+@container (max-width:700px){.dtm-controls{gap:4px 9px}.dtm-search{flex:1 1 140px}.dtm-filter-count{margin-left:0}.dtm-process-main{flex-wrap:wrap}.dtm-process .dtm-identity{flex-basis:calc(100% - 75px)}.dtm-process .dtm-stop{order:1}.dtm-port{order:2}.dtm-workspace{order:3}.dtm-process .dtm-state{order:4;margin-left:auto}.dtm-process-main{gap:3px 8px;padding-top:6px;padding-bottom:6px}.dtm-task-count{min-width:28px}}
+@container (max-width:470px){.dtm-controls .dtm-search{flex-basis:100%}.dtm-controls .dtm-filter-count{flex-basis:100%}.dtm-session-main{gap:5px}.dtm-session .dtm-state{min-width:58px}.dtm-session .dtm-task-count{display:none}.dtm-resource{padding-left:18px}.dtm-resource-type{width:53px}.dtm-time{display:none}}
+@media (pointer:coarse){.dtm-stop,.dtm-refresh,.dtm-chip,.dtm-tab,.dtm-check{min-height:44px}.dtm-search{height:38px}.dtm-session-main,.dtm-process-main{min-height:44px}.dtm-resource{min-height:44px}}
 `;
     const dict = {
-      en: { panel: 'Task Master', eyebrow: 'LIVE SYSTEM VIEW', title: 'Task Master', subtitle: 'See what is still running. Ownership is shown only when DSH can prove it.', refresh: 'Refresh', sessions: 'Active sessions', resources: 'Managed tasks', listeners: 'Listening processes', confirmed: 'Confirmed', suspected: 'Suspected', unknown: 'Unknown', all: 'All', stop: 'Stop', stopTurn: 'Stop turn', stopping: 'Stopping…', protected: 'Protected', noSessions: 'No active sessions or managed tasks.', noPorts: 'No listening processes in this category.', scanError: 'OS process scan failed', loadError: 'Could not load the task manager.', note: 'Suspected means a path mentions the workspace, not proof of session ownership. Unknown processes may belong to other apps. Stop affects the selected PID only.', ask: 'Stop this process? It may belong to another application. Its PID and start time will be checked again.', askOwned: 'Stop this DSH-managed task?', failed: 'Could not stop the target.', active: 'Running', idle: 'Idle', updated: 'Last checked', workspace: 'Workspace', session: 'Session', job: 'Job', terminal: 'Terminal', port: 'TCP listener', agent: 'Agent' },
-      de: { panel: 'Task-Master', eyebrow: 'SYSTEM · LIVE', title: 'Task-Master', subtitle: 'Was läuft noch? Eine Zuordnung gilt nur als bestätigt, wenn DSH den Besitzer kennt.', refresh: 'Aktualisieren', sessions: 'Aktive Sessions', resources: 'Verwaltete Aufgaben', listeners: 'Lauschende Prozesse', confirmed: 'Bestätigt', suspected: 'Vermutet', unknown: 'Unbekannt', all: 'Alle', stop: 'Beenden', stopTurn: 'Turn stoppen', stopping: 'Beendet…', protected: 'Geschützt', noSessions: 'Keine aktiven Sessions oder verwalteten Aufgaben.', noPorts: 'Keine lauschenden Prozesse in dieser Kategorie.', scanError: 'OS-Prozessscan fehlgeschlagen', loadError: 'Task-Master konnte nicht geladen werden.', note: 'Vermutet bedeutet nur: Ein Pfad erwähnt das Workspace. Unbekannte Prozesse können anderen Apps gehören. Beenden betrifft nur die ausgewählte PID.', ask: 'Diesen Prozess beenden? Er könnte zu einer anderen App gehören. PID und Startzeit werden nochmals geprüft.', askOwned: 'Diese verwaltete Aufgabe beenden?', failed: 'Ziel konnte nicht beendet werden.', active: 'Arbeitet', idle: 'Bereit', updated: 'Letzte Prüfung', workspace: 'Workspace', session: 'Session', job: 'Job', terminal: 'Terminal', port: 'TCP-Port', agent: 'Agent' },
+      en: {
+        title: 'Task Master', sessions: 'Sessions', processes: 'Processes', refresh: 'Refresh', checked: 'Checked',
+        search: 'Find workspace or session', sessionFilters: 'Session status', processFilters: 'Process ownership',
+        all: 'All', running: 'Running', idle: 'Idle', inactive: 'Inactive', archived: 'Archived', showArchived: 'Show archived', withTasks: 'Has activity',
+        confirmed: 'Confirmed', suspected: 'Suspected', unknown: 'Unknown', job: 'Job', terminal: 'Terminal', tasks: 'tasks',
+        stop: 'Stop', stopping: 'Stopping…', protected: 'Protected', stopTurn: 'Stop running turn',
+        emptySessions: 'No sessions match these filters.', emptyProcesses: 'No listening processes match this filter.',
+        scanError: 'OS process scan failed', loadError: 'Could not load Task Master.',
+        note: 'Suspected means a path mentions the workspace, not proof of ownership. Unknown processes may belong to other apps. Stop affects only the selected PID.',
+        ask: 'Stop this process? It may belong to another application. Its PID and start time will be checked again.',
+        askOwned: 'Stop this DSH-managed task?', failed: 'Could not stop the target.',
+      },
+      de: {
+        title: 'Task Master', sessions: 'Sessions', processes: 'Prozesse', refresh: 'Aktualisieren', checked: 'Geprüft',
+        search: 'Workspace oder Session suchen', sessionFilters: 'Session-Status', processFilters: 'Prozesszuordnung',
+        all: 'Alle', running: 'Läuft', idle: 'Bereit', inactive: 'Inaktiv', archived: 'Archiviert', showArchived: 'Archivierte anzeigen', withTasks: 'Mit Aktivität',
+        confirmed: 'Bestätigt', suspected: 'Vermutet', unknown: 'Unbekannt', job: 'Job', terminal: 'Terminal', tasks: 'Aufgaben',
+        stop: 'Stoppen', stopping: 'Stoppt…', protected: 'Geschützt', stopTurn: 'Laufenden Turn stoppen',
+        emptySessions: 'Keine Sessions für diese Filter.', emptyProcesses: 'Keine lauschenden Prozesse für diesen Filter.',
+        scanError: 'OS-Prozessscan fehlgeschlagen', loadError: 'Task Master konnte nicht geladen werden.',
+        note: 'Vermutet bedeutet nur: Ein Pfad erwähnt das Workspace. Unbekannte Prozesse können anderen Apps gehören. Stoppen betrifft nur die ausgewählte PID.',
+        ask: 'Diesen Prozess stoppen? Er könnte zu einer anderen App gehören. PID und Startzeit werden erneut geprüft.',
+        askOwned: 'Diese DSH-Aufgabe stoppen?', failed: 'Ziel konnte nicht gestoppt werden.',
+      },
     };
-    function icon(size, active) {
+    function Icon({ size, active }) {
       return h('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, style: { opacity: active ? 1 : .82 } },
         h('rect', { x: 3, y: 4, width: 18, height: 16, rx: 3 }),
         h('path', { d: 'M6.5 13h2.2l1.7-4 2.7 7 1.8-3h2.6' }));
@@ -35,15 +61,22 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots', 'locale'],
       apply(ctx) {
-        ctx.effect(() => ctx.locale.register('@pascapone/dsh-task-master', dict), 'task-manager: language');
+        ctx.effect(() => ctx.locale.register('@pascapone/dsh-task-master', dict), 'task-master: language');
         const t = ctx.locale.bind('@pascapone/dsh-task-master');
         function Panel() {
           React.useSyncExternalStore(cb => ctx.locale.subscribe(cb), () => ctx.locale.getSnapshot());
           const [data, setData] = React.useState(null);
           const [error, setError] = React.useState('');
-          const [filter, setFilter] = React.useState('all');
+          const [tab, setTab] = React.useState('sessions');
+          const [sessionStatus, setSessionStatus] = React.useState('all');
+          const [showArchived, setShowArchived] = React.useState(false);
+          const [withTasks, setWithTasks] = React.useState(false);
+          const [query, setQuery] = React.useState('');
+          const [ownership, setOwnership] = React.useState('all');
           const [busy, setBusy] = React.useState('');
-          const refresh = React.useCallback(async (signal) => {
+          const currentRequest = React.useRef(null);
+          const followupTimer = React.useRef(null);
+          const refresh = React.useCallback(async (signal = currentRequest.current?.signal) => {
             try {
               const response = await fetch(URL, { signal });
               if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -53,9 +86,10 @@ window.__ModuleLoader__.load({
           }, []);
           React.useEffect(() => {
             const controller = new AbortController();
+            currentRequest.current = controller;
             refresh(controller.signal);
             const timer = setInterval(() => { if (!document.hidden) refresh(controller.signal); }, 8000);
-            return () => { controller.abort(); clearInterval(timer); };
+            return () => { controller.abort(); clearInterval(timer); clearTimeout(followupTimer.current); currentRequest.current = null; };
           }, [refresh]);
           async function stop(target, key) {
             if (!window.confirm(target.kind === 'process' ? t('ask') : t('askOwned'))) return;
@@ -65,51 +99,106 @@ window.__ModuleLoader__.load({
               const result = await response.json();
               if (!response.ok) throw new Error(result.error ?? `HTTP ${response.status}`);
               await refresh();
-              setTimeout(() => { refresh(); }, 1200);
+              clearTimeout(followupTimer.current);
+              followupTimer.current = setTimeout(() => refresh(), 1200);
             } catch (failure) { setError(`${t('failed')} ${failure.message}`); }
             finally { setBusy(''); }
           }
+          function switchTab(event, next) {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const target = event.key === 'Home' ? 'sessions' : event.key === 'End' ? 'processes'
+              : next === 'sessions' ? 'processes' : 'sessions';
+            setTab(target);
+            event.currentTarget.parentElement.querySelector(`[data-task-master-tab="${target}"]`)?.focus();
+          }
           const sessions = data?.sessions ?? [];
           const processes = data?.processes ?? [];
-          const filtered = filter === 'all' ? processes : processes.filter(item => item.confidence === filter);
-          const count = sessions.reduce((n, item) => n + item.jobs.length + item.terminals.length, 0);
-          const stopButton = (target, key, disabled) => h('button', { type: 'button', className: 'dtm-stop' + (target.kind === 'process' ? ' danger' : ''), disabled: disabled || !!busy, onClick: () => stop(target, key) }, disabled ? t('protected') : busy === key ? t('stopping') : t('stop'));
-          return h('div', { className: 'dtm' }, h('style', null, CSS), h('div', { className: 'dtm-inner' },
-            h('header', { className: 'dtm-top' }, h('div', null,
-              h('div', { className: 'dtm-eyebrow' }, h('span', { className: 'dtm-live' }), t('eyebrow')),
-              h('h1', null, t('title')), h('p', { className: 'dtm-sub' }, t('subtitle'))),
-              h('button', { type: 'button', className: 'dtm-action', onClick: () => refresh() }, '↻  ', t('refresh'))),
-            h('div', { className: 'dtm-stats' },
-              [[sessions.length, t('sessions')], [count, t('resources')], [processes.length, t('listeners')]].map(([n, label]) =>
-                h('div', { className: 'dtm-stat', key: label }, h('strong', null, data ? n : '—'), h('span', null, label)))),
-            error && h('div', { className: 'dtm-notice error', role: 'alert' }, t('loadError'), ' ', error),
-            data?.scanError && h('div', { className: 'dtm-notice error', role: 'alert' }, t('scanError'), ': ', data.scanError),
-            h('div', { className: 'dtm-heading' }, h('h2', null, t('sessions')), h('span', { className: 'dtm-count' }, sessions.length)),
-            h('section', { className: 'dtm-list', 'aria-label': t('sessions') }, sessions.length ? sessions.map(session =>
-              h('div', { className: 'dtm-session', key: session.id },
-                h('div', { className: 'dtm-session-head' },
-                  h('div', { className: 'dtm-identity' }, h('div', { className: 'dtm-session-name', title: session.workspace ?? session.id }, session.workspace ?? session.id), h('div', { className: 'dtm-detail' }, t('session'), ' · ', session.id)),
-                  h('span', { className: 'dtm-tag ' + (session.running ? 'confirmed' : 'unknown') }, t(session.running ? 'active' : 'idle')),
-                  session.running && stopButton({ kind: 'turn', sessionId: session.id }, 'turn:' + session.id)),
-                (session.jobs.length > 0 || session.terminals.length > 0) && h('div', { className: 'dtm-resources' },
-                  session.jobs.map(job => h('div', { className: 'dtm-resource', key: job.id }, h('span', { className: 'dtm-tag confirmed' }, t('job')), h('span', { className: 'dtm-detail', title: job.label }, job.label, ' · ', job.status), stopButton({ kind: 'job', sessionId: session.id, id: job.id }, 'job:' + job.id))),
-                  session.terminals.map(terminal => h('div', { className: 'dtm-resource', key: terminal.source + terminal.id }, h('span', { className: 'dtm-tag confirmed' }, t('terminal')), h('span', { className: 'dtm-detail' }, terminal.label, terminal.pid ? ` · PID ${terminal.pid}` : ''), stopButton({ kind: terminal.source, sessionId: session.id, id: terminal.id }, terminal.source + terminal.id))))))
-              : h('div', { className: 'dtm-empty' }, t('noSessions'))),
-            h('div', { className: 'dtm-heading' }, h('h2', null, t('listeners')), h('span', { className: 'dtm-count' }, processes.length)),
-            h('div', { className: 'dtm-filters', role: 'group', 'aria-label': t('listeners') }, ['all', 'confirmed', 'suspected', 'unknown'].map(value =>
-              h('button', { type: 'button', className: 'dtm-filter', key: value, 'aria-pressed': filter === value, onClick: () => setFilter(value) }, t(value), value !== 'all' ? ` · ${processes.filter(item => item.confidence === value).length}` : ''))),
-            h('section', { className: 'dtm-list', 'aria-label': t('listeners') }, filtered.length ? filtered.map(item =>
-              h('div', { className: 'dtm-row', key: item.pid + ':' + item.started },
-                h('div', { className: 'dtm-identity' }, h('div', { className: 'dtm-name' }, item.name || `PID ${item.pid}`), h('div', { className: 'dtm-detail' }, 'PID ', item.pid, item.workspace ? ` · ${item.workspace}` : '', item.sessionId ? ` · ${t('session')} ${item.sessionId}` : '')),
-                h('div', { className: 'dtm-meta' }, h('div', { className: 'dtm-port', title: item.ports.join(', ') }, item.ports[0], item.ports.length > 1 ? ` +${item.ports.length - 1}` : ''), h('span', { className: 'dtm-tag ' + item.confidence }, t(item.confidence))),
-                stopButton({ kind: 'process', pid: item.pid, started: item.started }, 'pid:' + item.pid, item.protected)))
-              : h('div', { className: 'dtm-empty' }, t('noPorts'))),
-            h('div', { className: 'dtm-foot' }, t('note'), data && ` · ${t('updated')}: ${new Date(data.scannedAt).toLocaleTimeString()}`)
-          ));
+          const scope = sessions.filter(item => showArchived || !item.archived);
+          const normalized = query.trim().toLocaleLowerCase();
+          const visible = scope.filter(item =>
+            (sessionStatus === 'all' || (sessionStatus === 'running' ? item.running
+              : sessionStatus === 'idle' ? item.available && !item.running && !item.archived
+              : !item.available && !item.archived)) &&
+            (!withTasks || item.running || item.jobs.length + item.terminals.length > 0) &&
+            (!normalized || `${item.workspace ?? ''} ${item.id}`.toLocaleLowerCase().includes(normalized)));
+          const shownProcesses = ownership === 'all' ? processes : processes.filter(item => item.confidence === ownership);
+          const tabButton = (id, label, count) => h('button', {
+            type: 'button', role: 'tab', id: `dtm-tab-${id}`, key: id, 'data-task-master-tab': id,
+            'aria-controls': `dtm-panel-${id}`, 'aria-selected': tab === id,
+            tabIndex: tab === id ? 0 : -1, className: 'dtm-tab', onClick: () => setTab(id),
+            onKeyDown: event => switchTab(event, id),
+          }, label, h('span', { className: 'dtm-tab-count' }, count));
+          const chip = (value, selected, choose, label, count) => h('button', {
+            key: value, type: 'button', className: 'dtm-chip', 'aria-pressed': selected === value, onClick: () => choose(value),
+          }, label, count === undefined ? null : h('span', { className: 'dtm-chip-count' }, ` ${count}`));
+          const stopButton = (target, key, disabled, label, disabledLabel = t('protected')) => h('button', {
+            type: 'button', className: 'dtm-stop' + (target.kind === 'process' ? ' danger' : ''),
+            disabled: disabled || !!busy, title: disabled ? disabledLabel : label,
+            'aria-label': disabled ? `${disabledLabel}: ${label}` : label,
+            onClick: () => stop(target, key),
+          }, disabled ? disabledLabel : busy === key ? t('stopping') : t('stop'));
+          const status = (kind, label) => h('span', { className: `dtm-state ${kind}` }, label);
+          return h('div', { className: 'dtm' }, h('style', null, CSS),
+            h('header', { className: 'dtm-head' },
+              h('div', { className: 'dtm-toolbar' },
+                h('span', { className: 'dtm-title' }, t('title')),
+                h('span', { className: 'dtm-spacer' }),
+                data && h('time', { className: 'dtm-time', dateTime: new Date(data.scannedAt).toISOString() }, t('checked'), ' ', new Date(data.scannedAt).toLocaleTimeString()),
+                h('button', { type: 'button', className: 'dtm-refresh', title: t('refresh'), 'aria-label': t('refresh'), onClick: () => refresh() }, '↻')),
+              h('div', { className: 'dtm-tabs', role: 'tablist', 'aria-label': t('title') },
+                tabButton('sessions', t('sessions'), scope.length), tabButton('processes', t('processes'), processes.length))),
+            h('section', { id: 'dtm-panel-sessions', role: 'tabpanel', 'aria-labelledby': 'dtm-tab-sessions', className: 'dtm-panel', hidden: tab !== 'sessions', tabIndex: 0 },
+              h('div', { className: 'dtm-controls' },
+                h('input', { type: 'search', className: 'dtm-search', value: query, onChange: event => setQuery(event.target.value), placeholder: t('search'), 'aria-label': t('search') }),
+                h('div', { className: 'dtm-segment', role: 'group', 'aria-label': t('sessionFilters'), title: t('sessionFilters') },
+                  ['all', 'running', 'idle', 'inactive'].map(value => chip(value, sessionStatus, setSessionStatus, t(value)))),
+                h('label', { className: 'dtm-check' }, h('input', { type: 'checkbox', checked: withTasks, onChange: event => setWithTasks(event.target.checked) }), t('withTasks')),
+                h('label', { className: 'dtm-check' }, h('input', { type: 'checkbox', checked: showArchived, onChange: event => setShowArchived(event.target.checked) }), t('showArchived'),
+                  h('span', { className: 'dtm-chip-count' }, sessions.filter(item => item.archived).length)),
+                h('span', { className: 'dtm-filter-count', 'aria-live': 'polite' }, `${visible.length} / ${scope.length}`)),
+              error && h('div', { className: 'dtm-notice error', role: 'alert' }, t('loadError'), ' ', error),
+              visible.length ? visible.map(session => {
+                const count = session.jobs.length + session.terminals.length;
+                const state = session.archived ? 'archived' : session.running ? 'running' : session.available ? 'idle' : 'inactive';
+                return h('div', { className: 'dtm-session', key: session.id },
+                  h('div', { className: 'dtm-session-main' },
+                    h('div', { className: 'dtm-identity', title: `${session.workspace ?? session.id} · ${session.id}` },
+                      h('span', { className: 'dtm-name' }, session.workspace ?? session.id),
+                      h('span', { className: 'dtm-id', title: session.id }, session.id.slice(-8))),
+                    status(state, t(state)),
+                    h('span', { className: 'dtm-task-count' }, count ? `${count} ${t('tasks')}` : ''),
+                    session.running ? stopButton({ kind: 'turn', sessionId: session.id }, `turn:${session.id}`, false, `${t('stopTurn')}: ${session.id}`)
+                      : h('span', { className: 'dtm-stop', 'aria-hidden': true })),
+                  session.jobs.map(job => h('div', { className: 'dtm-resource', key: `job:${job.id}` },
+                    h('span', { className: 'dtm-resource-type' }, t('job')),
+                    h('span', { className: 'dtm-resource-name', title: job.label }, job.label),
+                    stopButton({ kind: 'job', sessionId: session.id, id: job.id }, `job:${job.id}`, job.status !== 'running', `${t('stop')} ${t('job')}: ${job.label}`, t('stopping')))),
+                  session.terminals.map(terminal => h('div', { className: 'dtm-resource', key: `${terminal.source}:${terminal.id}` },
+                    h('span', { className: 'dtm-resource-type' }, t('terminal')),
+                    h('span', { className: 'dtm-resource-name', title: terminal.label }, terminal.label, terminal.pid ? ` · PID ${terminal.pid}` : ''),
+                    stopButton({ kind: terminal.source, sessionId: session.id, id: terminal.id }, `${terminal.source}:${terminal.id}`, false, `${t('stop')} ${t('terminal')}: ${terminal.label}`))));
+              }) : h('div', { className: 'dtm-empty' }, t('emptySessions'))),
+            h('section', { id: 'dtm-panel-processes', role: 'tabpanel', 'aria-labelledby': 'dtm-tab-processes', className: 'dtm-panel', hidden: tab !== 'processes', tabIndex: 0 },
+              h('div', { className: 'dtm-controls' },
+                h('div', { className: 'dtm-segment', role: 'group', 'aria-label': t('processFilters') },
+                  ['all', 'confirmed', 'suspected', 'unknown'].map(value => chip(value, ownership, setOwnership, t(value), value === 'all' ? processes.length : processes.filter(item => item.confidence === value).length))),
+                h('span', { className: 'dtm-filter-count', 'aria-live': 'polite' }, `${shownProcesses.length} / ${processes.length}`)),
+              error && h('div', { className: 'dtm-notice error', role: 'alert' }, t('loadError'), ' ', error),
+              data?.scanError && h('div', { className: 'dtm-notice error', role: 'alert' }, t('scanError'), ': ', data.scanError),
+              shownProcesses.length ? shownProcesses.map(item => h('div', { className: 'dtm-process', key: `${item.pid}:${item.started}` },
+                h('div', { className: 'dtm-process-main' },
+                  h('div', { className: 'dtm-identity', title: `${item.name || item.pid} · PID ${item.pid}` },
+                    h('span', { className: 'dtm-name' }, item.name || `PID ${item.pid}`), h('span', { className: 'dtm-pid' }, `PID ${item.pid}`)),
+                  h('span', { className: 'dtm-workspace', title: item.workspace ?? '' }, item.workspace ?? ''),
+                  h('span', { className: 'dtm-port', title: item.ports.join(', ') }, item.ports[0], item.ports.length > 1 ? ` +${item.ports.length - 1}` : ''),
+                  status(item.confidence, t(item.confidence)),
+                  stopButton({ kind: 'process', pid: item.pid, started: item.started }, `pid:${item.pid}`, item.protected, `${t('stop')} PID ${item.pid} · ${item.ports.join(', ')}`))))
+                : h('div', { className: 'dtm-empty' }, t('emptyProcesses')),
+              h('p', { className: 'dtm-notice' }, t('note'))));
         }
-        function Icon({ size, active }) { return icon(size, active); }
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: 'dsh-task-master' }, Panel));
-        ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: 'dsh-task-master', order: 12, label: () => t('panel') }, Icon));
+        ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: 'dsh-task-master', order: 12, label: () => t('title') }, Icon));
       },
     };
   },
