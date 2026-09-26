@@ -1,0 +1,3 @@
+- insert:
+    - id: dsh-task-master
+      name: '@pascapone/dsh-task-master'
