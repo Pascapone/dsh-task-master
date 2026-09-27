@@ -30,7 +30,7 @@ runInNewContext(readFileSync(new URL('./client.js', import.meta.url), 'utf8'), {
     if (!options?.body) return { ok: true, json: async () => hooks[0] };
     const body = JSON.parse(options.body);
     posted.push(body);
-    return { ok: true, json: async () => ({ result: body.kind === 'gateway-logs' ? { text: 'ready', next: 5, lossy: true } : 'ok' }) };
+    return { ok: true, json: async () => ({ result: body.kind === 'gateway-logs' ? { text: body.from === 0 ? 'ready' : body.from === 5 ? '\nnext' : '', next: body.from === 0 ? 5 : 10, hasMore: body.from === 0, lossy: body.from === 0 } : 'ok' }) };
   },
 }, { filename: 'client.js' });
 bundle.factory(() => React).apply({
@@ -59,7 +59,7 @@ hooks[0] = {
     { id: 'turn-5', workspace: 'Epsilon', running: true, available: true, archived: false, jobs: [], terminals: [] },
   ],
   processes: [{ pid: 42, started: '12345678901234567', name: 'example', ports: ['127.0.0.1:8000'], confidence: 'unknown', protected: false, workspace: null }],
-  gateways: [{ id: 'g1', label: 'Preview', status: 'ready', workspace: 'Alpha', bundles: ['demo'], url: 'http://127.0.0.1:3190/api/dsh-dev-gateways/open?id=g1', expiresAt: null, ownerSessionId: 'live-1' }],
+  gateways: [{ id: 'g1', label: 'Preview', status: 'ready', workspace: 'Alpha', bundles: ['demo'], url: 'http://127.0.0.1:3190/api/dsh-dev-gateways/open?id=g1', expiresAt: null, kind: 'project', ownerKind: 'agent', ownerSessionId: 'live-1', startCommand: 'npm run dev', serverUrl: 'http://127.0.0.1:3200/', loginUrl: 'http://127.0.0.1:3200/?token=DO-NOT-RENDER' }],
 };
 let tree = render();
 assert.equal(rows(tree).length, 4, 'all unarchived sessions, including inactive history, must be shown');
@@ -109,13 +109,64 @@ const gateway = panel(tree, 'gateways');
 assert.equal(gateway.props.hidden, false);
 assert.equal(select(gateway, node => node.props.className === 'dtm-gateway').length, 1);
 assert.equal(select(gateway, node => node.tag === 'a')[0].props.href, 'http://127.0.0.1:3190/api/dsh-dev-gateways/open?id=g1');
+assert.match(JSON.stringify(gateway), /projectServer/);
+assert.match(JSON.stringify(gateway), /agentOwner: live-1/);
+assert.match(JSON.stringify(gateway), /command: npm run dev/);
+assert.doesNotMatch(JSON.stringify(gateway), /DO-NOT-RENDER/);
+assert.match(JSON.stringify(gateway), /localAccess/);
+const safeUrl = hooks[0].gateways[0].url;
+for (const url of ['javascript:alert(1)', 'http://127.0.0.1:3200/?token=secret', 'http://evil.example/api/dsh-dev-gateways/open?id=g1']) {
+  hooks[0].gateways[0].url = url;
+  assert.equal(select(panel(render(), 'gateways'), node => node.tag === 'a').length, 0, 'only a token-free local controller link is rendered');
+}
+hooks[0].gateways[0].url = safeUrl;
+hooks[0].gateways[0].kind = 'dsh';
+hooks[0].gateways[0].ownerKind = 'operator';
+assert.match(JSON.stringify(panel(render(), 'gateways')), /dshGateway/);
+assert.ok(select(panel(render(), 'gateways'), node => node.children.includes('operator')).length);
+const minuteInput = select(gateway, node => node.tag === 'input' && node.props.type === 'number')[0];
+assert.equal(minuteInput.props.max, 480);
+minuteInput.props.onChange({ target: { value: '481' } });
+let extendButton = select(panel(render(), 'gateways'), node => node.props['aria-label'] === 'extend: Preview')[0];
+assert.equal(extendButton.props.disabled, true);
+const postCount = posted.length;
+await extendButton.props.onClick();
+assert.equal(posted.length, postCount, 'out-of-bounds extension must not submit');
+minuteInput.props.onChange({ target: { value: '30' } });
 await select(gateway, node => node.tag === 'button' && node.props['aria-label'] === 'logs: Preview')[0].props.onClick();
 assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-logs', id: 'g1', from: 0 });
 assert.equal(select(panel(render(), 'gateways'), node => node.tag === 'pre')[0].children[0], 'ready');
+await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.children.includes('moreLogs'))[0].props.onClick();
+assert.equal(posted.at(-1).from, 5);
+assert.equal(select(panel(render(), 'gateways'), node => node.tag === 'pre')[0].children[0], 'ready\nnext');
+assert.equal(select(panel(render(), 'gateways'), node => node.tag === 'button' && node.children.includes('moreLogs')).length, 0);
+assert.ok(select(panel(render(), 'gateways'), node => node.children.includes('lostLogs')).length, 'lossy warning survives pagination');
+await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.children.includes('refreshLogs'))[0].props.onClick();
+assert.equal(posted.at(-1).from, 10);
+assert.equal(select(panel(render(), 'gateways'), node => node.tag === 'pre')[0].children[0], 'ready\nnext');
 await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.props['aria-label'] === 'extend: Preview')[0].props.onClick();
 assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-extend', id: 'g1', minutes: 30 });
 await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.props['aria-label'] === 'stop: Preview')[0].props.onClick();
 assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-stop', id: 'g1' });
+for (const state of ['stopping', 'stopped', 'failed', 'unknown']) {
+  hooks[0].gateways[0].status = state;
+  for (const action of ['extend', 'stop']) {
+    const button = select(panel(render(), 'gateways'), node => node.props['aria-label'] === `${action}: Preview`)[0];
+    assert.equal(button.props.disabled, true, `${action} must be disabled for ${state}`);
+    const count = posted.length;
+    await button.props.onClick();
+    assert.equal(posted.length, count, `${action} handler must guard ${state}`);
+  }
+}
+for (const state of ['starting', 'ready']) {
+  hooks[0].gateways[0].status = state;
+  for (const action of ['extend', 'stop']) {
+    assert.equal(select(panel(render(), 'gateways'), node => node.props['aria-label'] === `${action}: Preview`)[0].props.disabled, false);
+  }
+}
+hooks[0].gateways[0].status = 'failed';
+hooks[0].gateways[0].reason = 'Server exited: missing entrypoint';
+assert.ok(select(panel(render(), 'gateways'), node => node.props.role === 'status' && node.children.includes('Server exited: missing entrypoint')).length, 'failure reason must be visible');
 hooks[0].gateways[0].status = 'stopped';
 await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.props['aria-label'] === 'prune: Preview')[0].props.onClick();
 assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-prune', id: 'g1' });

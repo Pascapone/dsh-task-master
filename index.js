@@ -193,11 +193,11 @@ export function apply(ctx) {
             if (input.kind === 'gateway-stop') result = await gateways.stop(input.id, operator);
             if (input.kind === 'gateway-prune') result = await gateways.prune(input.id, operator);
             if (input.kind === 'gateway-extend') {
-              if (!Number.isSafeInteger(input.minutes) || input.minutes <= 0) throw new Error('Ungültige Verlängerung');
+              if (!Number.isSafeInteger(input.minutes) || input.minutes <= 0 || input.minutes > 480) throw new Error('Ungültige Verlängerung');
               result = await gateways.extend(input.id, input.minutes, operator);
             }
             if (input.kind === 'gateway-logs') {
-              if (!(typeof input.from === 'string' && input.from.length > 0) && !(Number.isSafeInteger(input.from) && input.from >= 0)) throw new Error('Ungültiger Log-Cursor');
+              if (!Number.isSafeInteger(input.from) || input.from < 0) throw new Error('Ungültiger Log-Cursor');
               result = await gateways.logs(input.id, input.from, operator);
             }
             return Response.json({ result }, { headers: { 'cache-control': 'no-store' } });

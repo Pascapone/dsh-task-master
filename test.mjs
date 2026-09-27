@@ -97,6 +97,11 @@ assert.deepEqual(calls.slice(-4), [
   ['prune', 'g1', { operator: true }],
 ]);
 assert.equal((await post({ kind: 'gateway-extend', id: 'g1', minutes: 0 })).status, 400);
+assert.equal((await post({ kind: 'gateway-extend', id: 'g1', minutes: 481 })).status, 400);
+assert.equal((await post({ kind: 'gateway-extend', id: 'g1', minutes: 480 })).status, 200);
+for (const from of ['0', -1, 0.5, null]) {
+  assert.equal((await post({ kind: 'gateway-logs', id: 'g1', from })).status, 400);
+}
 const response = await route.fetch(new Request('http://localhost/api/dsh-task-master', { method: 'POST', body: JSON.stringify({ kind: 'job', sessionId: 's1', id: 'bash-1' }) }));
 assert.equal(response.status, 200);
 assert.deepEqual(killed, ['bash-1', 's1', 'Beendet im Task-Manager']);

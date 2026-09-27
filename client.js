@@ -40,9 +40,11 @@ window.__ModuleLoader__.load({
         note: 'Suspected means a path mentions the workspace, not proof of ownership. Unknown processes may belong to other apps. Stop affects only the selected PID.',
         ask: 'Stop this process? It may belong to another application. Its PID and start time will be checked again.',
         askOwned: 'Stop this DSH-managed task?', failed: 'Could not stop the target.',
-        gateways: 'Dev Gateways', emptyGateways: 'No dev gateways available.', gatewayError: 'Dev gateway inventory failed',
+        gateways: 'Dev Servers', emptyGateways: 'No dev servers available.', gatewayError: 'Dev server inventory failed',
+        projectServer: 'Project server', dshGateway: 'DSH gateway', operator: 'Operator', agentOwner: 'Agent', command: 'Start command',
+        localAccess: 'Open links work only on the gateway computer. Remote/mobile access requires a secured proxy.', refreshLogs: 'Refresh logs',
         open: 'Open', logs: 'Logs', moreLogs: 'More logs', noLogs: 'No logs available.', lostLogs: 'Earlier log entries were lost.',
-        extend: 'Extend', minutes: 'Minutes', expires: 'Expires', gatewayStop: 'Stop this dev gateway?', prune: 'Delete data', gatewayPrune: 'Permanently delete this stopped gateway’s profile, sessions and logs?', gatewayFailed: 'Gateway action failed.',
+        extend: 'Extend', minutes: 'Minutes', expires: 'Expires', gatewayStop: 'Stop this dev server?', prune: 'Delete data', gatewayPrune: 'Permanently delete this stopped gateway’s profile, sessions and logs?', gatewayFailed: 'Gateway action failed.',
       },
       de: {
         title: 'Task Master', sessions: 'Sessions', processes: 'Prozesse', refresh: 'Aktualisieren', checked: 'Geprüft',
@@ -55,9 +57,11 @@ window.__ModuleLoader__.load({
         note: 'Vermutet bedeutet nur: Ein Pfad erwähnt das Workspace. Unbekannte Prozesse können anderen Apps gehören. Stoppen betrifft nur die ausgewählte PID.',
         ask: 'Diesen Prozess stoppen? Er könnte zu einer anderen App gehören. PID und Startzeit werden erneut geprüft.',
         askOwned: 'Diese DSH-Aufgabe stoppen?', failed: 'Ziel konnte nicht gestoppt werden.',
-        gateways: 'Dev-Gateways', emptyGateways: 'Keine Dev-Gateways verfügbar.', gatewayError: 'Dev-Gateway-Inventar fehlgeschlagen',
+        gateways: 'Dev-Server', emptyGateways: 'Keine Dev-Server verfügbar.', gatewayError: 'Dev-Server-Inventar fehlgeschlagen',
+        projectServer: 'Projektserver', dshGateway: 'DSH-Gateway', operator: 'Betreiber', agentOwner: 'Agent', command: 'Startbefehl',
+        localAccess: 'Öffnungslinks funktionieren nur am Gateway-Rechner. Fernzugriff/Mobilzugriff benötigt einen abgesicherten Proxy.', refreshLogs: 'Logs aktualisieren',
         open: 'Öffnen', logs: 'Logs', moreLogs: 'Weitere Logs', noLogs: 'Keine Logs vorhanden.', lostLogs: 'Ältere Log-Einträge gingen verloren.',
-        extend: 'Verlängern', minutes: 'Minuten', expires: 'Läuft ab', gatewayStop: 'Dieses Dev-Gateway stoppen?', prune: 'Daten löschen', gatewayPrune: 'Profil, Sessions und Logs dieses gestoppten Gateways unwiderruflich löschen?', gatewayFailed: 'Gateway-Aktion fehlgeschlagen.',
+        extend: 'Verlängern', minutes: 'Minuten', expires: 'Läuft ab', gatewayStop: 'Diesen Dev-Server stoppen?', prune: 'Daten löschen', gatewayPrune: 'Profil, Sessions und Logs dieses gestoppten Gateways unwiderruflich löschen?', gatewayFailed: 'Gateway-Aktion fehlgeschlagen.',
       },
     };
     function Icon({ size, active }) {
@@ -118,13 +122,14 @@ window.__ModuleLoader__.load({
             finally { setBusy(''); }
           }
           async function gatewayAction(kind, id, from = 0) {
+            if (['gateway-stop', 'gateway-extend'].includes(kind) && !['starting', 'ready'].includes(data?.gateways?.find(item => item.id === id)?.status)) return;
             if (kind === 'gateway-stop' && !window.confirm(t('gatewayStop'))) return;
             if (kind === 'gateway-prune' && !window.confirm(t('gatewayPrune'))) return;
-            if (kind === 'gateway-extend' && (!Number.isSafeInteger(Number(minutes)) || Number(minutes) <= 0)) return;
+            if (kind === 'gateway-extend' && (!Number.isSafeInteger(Number(minutes)) || Number(minutes) <= 0 || Number(minutes) > 480)) return;
             setBusy(`${kind}:${id}`);
             try {
               const result = await post({ kind, id, ...(kind === 'gateway-extend' ? { minutes: Number(minutes) } : {}), ...(kind === 'gateway-logs' ? { from } : {}) });
-              if (kind === 'gateway-logs') setGatewayLogs(previous => ({ id, text: (previous?.id === id && from !== 0 ? previous.text : '') + result.text, next: result.next, lossy: !!result.lossy || !!(previous?.id === id && from !== 0 && previous.lossy), from }));
+              if (kind === 'gateway-logs') setGatewayLogs(previous => ({ id, text: (previous?.id === id && from !== 0 ? previous.text : '') + result.text, next: result.next, hasMore: result.hasMore ?? result.next > from, lossy: !!result.lossy || !!(previous?.id === id && from !== 0 && previous.lossy), from }));
               else { setGatewayLogs(previous => kind === 'gateway-stop' && previous?.id === id ? null : previous); await refresh(); }
               setError('');
             } catch (failure) { setError(`${t('gatewayFailed')} ${failure.message}`); }
@@ -228,26 +233,31 @@ window.__ModuleLoader__.load({
             h('section', { id: 'dtm-panel-gateways', role: 'tabpanel', 'aria-labelledby': 'dtm-tab-gateways', className: 'dtm-panel', hidden: tab !== 'gateways', tabIndex: 0 },
               error && h('div', { className: 'dtm-notice error', role: 'alert' }, error),
               data?.gatewayError && h('div', { className: 'dtm-notice error', role: 'alert' }, t('gatewayError'), ': ', data.gatewayError),
+              gateways.length > 0 && h('div', { className: 'dtm-notice' }, t('localAccess')),
               gateways.length ? gateways.map(item => h('div', { className: 'dtm-gateway', key: item.id },
                 h('div', { className: 'dtm-gateway-main' },
                   h('div', { className: 'dtm-identity', title: item.id },
                     h('span', { className: 'dtm-name' }, item.label || item.id),
+                    h('span', { className: 'dtm-gateway-meta' }, t(item.kind === 'project' ? 'projectServer' : 'dshGateway')),
+                    h('span', { className: 'dtm-gateway-meta' }, item.ownerKind === 'operator' ? t('operator') : `${t('agentOwner')}: ${item.ownerSessionId || '—'}`),
                     status(item.status === 'ready' ? 'running' : 'inactive', item.status)),
                   h('span', { className: 'dtm-gateway-meta', title: [item.workspace, Array.isArray(item.bundles) ? item.bundles.join(', ') : item.bundles, item.ownerSessionId].filter(Boolean).join(' · ') },
                     [item.workspace, Array.isArray(item.bundles) ? item.bundles.join(', ') : item.bundles, item.ownerSessionId].filter(Boolean).join(' · ')),
                   h('div', { className: 'dtm-gateway-actions' },
-                    item.status === 'ready' && typeof item.url === 'string' && /^http:\/\/127\.0\.0\.1:\d+\//i.test(item.url) && h('a', { className: 'dtm-stop dtm-link', href: item.url, target: '_blank', rel: 'noopener noreferrer' }, t('open')),
+                    item.status === 'ready' && typeof item.url === 'string' && /^http:\/\/127\.0\.0\.1:\d+\/api\/dsh-dev-gateways\/open\?id=[\w%-]+$/i.test(item.url) && h('a', { className: 'dtm-stop dtm-link', href: item.url, target: '_blank', rel: 'noopener noreferrer' }, t('open')),
                     h('button', { type: 'button', className: 'dtm-stop', disabled: !!busy, 'aria-label': `${t('logs')}: ${item.label || item.id}`, onClick: () => gatewayLogs?.id === item.id ? setGatewayLogs(null) : gatewayAction('gateway-logs', item.id) }, t('logs')),
-                    h('input', { type: 'number', className: 'dtm-minutes', min: 1, step: 1, value: minutes, onChange: event => setMinutes(event.target.value), 'aria-label': t('minutes') }),
-                    h('button', { type: 'button', className: 'dtm-stop', disabled: !!busy || !Number.isSafeInteger(Number(minutes)) || Number(minutes) <= 0, 'aria-label': `${t('extend')}: ${item.label || item.id}`, onClick: () => gatewayAction('gateway-extend', item.id) }, t('extend')),
-                    h('button', { type: 'button', className: 'dtm-stop danger', disabled: !!busy || ['stopped', 'failed', 'unknown'].includes(item.status), 'aria-label': `${t('stop')}: ${item.label || item.id}`, onClick: () => gatewayAction('gateway-stop', item.id) }, busy === `gateway-stop:${item.id}` ? t('stopping') : t('stop')),
+                    h('input', { type: 'number', className: 'dtm-minutes', min: 1, max: 480, step: 1, value: minutes, onChange: event => setMinutes(event.target.value), 'aria-label': t('minutes') }),
+                    h('button', { type: 'button', className: 'dtm-stop', disabled: !!busy || !['starting', 'ready'].includes(item.status) || !Number.isSafeInteger(Number(minutes)) || Number(minutes) <= 0 || Number(minutes) > 480, 'aria-label': `${t('extend')}: ${item.label || item.id}`, onClick: () => gatewayAction('gateway-extend', item.id) }, t('extend')),
+                    h('button', { type: 'button', className: 'dtm-stop danger', disabled: !!busy || !['starting', 'ready'].includes(item.status), 'aria-label': `${t('stop')}: ${item.label || item.id}`, onClick: () => gatewayAction('gateway-stop', item.id) }, busy === `gateway-stop:${item.id}` ? t('stopping') : t('stop')),
                     ['stopped', 'failed'].includes(item.status) && !item.retainData && h('button', { type: 'button', className: 'dtm-stop danger', disabled: !!busy, 'aria-label': `${t('prune')}: ${item.label || item.id}`, onClick: () => gatewayAction('gateway-prune', item.id) }, t('prune'))),
                   item.expiresAt && h('span', { className: 'dtm-gateway-meta', title: `${t('expires')}: ${item.expiresAt}` }, `${t('expires')}: ${new Date(item.expiresAt).toLocaleString()}`)),
+                item.startCommand && h('div', { className: 'dtm-gateway-meta', title: item.startCommand }, `${t('command')}: ${item.startCommand}`),
+                item.reason && h('div', { className: 'dtm-notice', role: 'status' }, item.reason),
                 gatewayLogs?.id === item.id && h('div', null,
                   gatewayLogs.lossy && h('div', { className: 'dtm-notice', role: 'status' }, t('lostLogs')),
                   h('pre', { className: 'dtm-logs' }, gatewayLogs.text || t('noLogs')),
-                  gatewayLogs.next != null && gatewayLogs.next !== gatewayLogs.from && h('div', { className: 'dtm-logs-more' },
-                    h('button', { type: 'button', className: 'dtm-stop', disabled: !!busy, onClick: () => gatewayAction('gateway-logs', item.id, gatewayLogs.next) }, t('moreLogs'))))))
+                  Number.isSafeInteger(gatewayLogs.next) && gatewayLogs.next >= 0 && h('div', { className: 'dtm-logs-more' },
+                    h('button', { type: 'button', className: 'dtm-stop', disabled: !!busy, onClick: () => gatewayAction('gateway-logs', item.id, gatewayLogs.next) }, t(gatewayLogs.hasMore ? 'moreLogs' : 'refreshLogs'))))))
                 : h('div', { className: 'dtm-empty' }, t('emptyGateways'))));
         }
         ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: 'dsh-task-master' }, Panel));
