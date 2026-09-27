@@ -59,7 +59,7 @@ hooks[0] = {
     { id: 'turn-5', workspace: 'Epsilon', running: true, available: true, archived: false, jobs: [], terminals: [] },
   ],
   processes: [{ pid: 42, started: '12345678901234567', name: 'example', ports: ['127.0.0.1:8000'], confidence: 'unknown', protected: false, workspace: null }],
-  gateways: [{ id: 'g1', label: 'Preview', status: 'ready', workspace: 'Alpha', bundles: ['demo'], url: 'http://127.0.0.1:3190/api/dsh-dev-gateways/open?id=g1', expiresAt: null, kind: 'project', ownerKind: 'agent', ownerSessionId: 'live-1', startCommand: 'npm run dev', serverUrl: 'http://127.0.0.1:3200/', loginUrl: 'http://127.0.0.1:3200/?token=DO-NOT-RENDER' }],
+  gateways: [{ id: 'g1', label: 'Preview', status: 'ready', workspace: 'Alpha', bundles: ['demo'], url: 'http://127.0.0.1:3190/api/dsh-dev-gateways/open?id=g1', expiresAt: null, kind: 'project', ownerKind: 'agent', ownerSessionId: 'live-1', dataDir: 'C:\\temp\\gateway\\data', cleanupOnArchive: true, startCommand: 'npm run dev', serverUrl: 'http://127.0.0.1:3200/', loginUrl: 'http://127.0.0.1:3200/?token=DO-NOT-RENDER' }],
 };
 let tree = render();
 assert.equal(rows(tree).length, 4, 'all unarchived sessions, including inactive history, must be shown');
@@ -112,6 +112,14 @@ assert.equal(select(gateway, node => node.tag === 'a')[0].props.href, 'http://12
 assert.match(JSON.stringify(gateway), /projectServer/);
 assert.match(JSON.stringify(gateway), /agentOwner: live-1/);
 assert.match(JSON.stringify(gateway), /command: npm run dev/);
+assert.match(JSON.stringify(gateway), /tempData: C:.*onArchive/);
+hooks[0].gateways[0].cleanupPending = true;
+assert.match(JSON.stringify(panel(render(), 'gateways')), /pendingCleanup/);
+hooks[0].gateways[0].cleanupError = 'EBUSY';
+assert.match(JSON.stringify(panel(render(), 'gateways')), /blockedCleanup/);
+assert.ok(select(panel(render(), 'gateways'), node => node.props.role === 'alert' && node.children.includes('EBUSY')).length);
+delete hooks[0].gateways[0].cleanupError;
+delete hooks[0].gateways[0].cleanupPending;
 assert.doesNotMatch(JSON.stringify(gateway), /DO-NOT-RENDER/);
 assert.match(JSON.stringify(gateway), /localAccess/);
 const safeUrl = hooks[0].gateways[0].url;

@@ -42,9 +42,10 @@ window.__ModuleLoader__.load({
         askOwned: 'Stop this DSH-managed task?', failed: 'Could not stop the target.',
         gateways: 'Dev Servers', emptyGateways: 'No dev servers available.', gatewayError: 'Dev server inventory failed',
         projectServer: 'Project server', dshGateway: 'DSH gateway', operator: 'Operator', agentOwner: 'Agent', command: 'Start command',
+        tempData: 'Temporary data', onArchive: 'delete on archive', kept: 'keep', manual: 'manual cleanup', pendingCleanup: 'cleanup pending', blockedCleanup: 'cleanup blocked',
         localAccess: 'Open links work only on the gateway computer. Remote/mobile access requires a secured proxy.', refreshLogs: 'Refresh logs',
         open: 'Open', logs: 'Logs', moreLogs: 'More logs', noLogs: 'No logs available.', lostLogs: 'Earlier log entries were lost.',
-        extend: 'Extend', minutes: 'Minutes', expires: 'Expires', gatewayStop: 'Stop this dev server?', prune: 'Delete data', gatewayPrune: 'Permanently delete this stopped gateway’s profile, sessions and logs?', gatewayFailed: 'Gateway action failed.',
+        extend: 'Extend', minutes: 'Minutes', expires: 'Expires', gatewayStop: 'Stop this dev server?', prune: 'Delete data', gatewayPrune: 'Permanently delete this stopped gateway’s temporary data, profile, sessions and logs?', gatewayFailed: 'Gateway action failed.',
       },
       de: {
         title: 'Task Master', sessions: 'Sessions', processes: 'Prozesse', refresh: 'Aktualisieren', checked: 'Geprüft',
@@ -59,9 +60,10 @@ window.__ModuleLoader__.load({
         askOwned: 'Diese DSH-Aufgabe stoppen?', failed: 'Ziel konnte nicht gestoppt werden.',
         gateways: 'Dev-Server', emptyGateways: 'Keine Dev-Server verfügbar.', gatewayError: 'Dev-Server-Inventar fehlgeschlagen',
         projectServer: 'Projektserver', dshGateway: 'DSH-Gateway', operator: 'Betreiber', agentOwner: 'Agent', command: 'Startbefehl',
+        tempData: 'Temporäre Daten', onArchive: 'beim Archivieren löschen', kept: 'behalten', manual: 'manuell verwaltet', pendingCleanup: 'Bereinigung ausstehend', blockedCleanup: 'Bereinigung blockiert',
         localAccess: 'Öffnungslinks funktionieren nur am Gateway-Rechner. Fernzugriff/Mobilzugriff benötigt einen abgesicherten Proxy.', refreshLogs: 'Logs aktualisieren',
         open: 'Öffnen', logs: 'Logs', moreLogs: 'Weitere Logs', noLogs: 'Keine Logs vorhanden.', lostLogs: 'Ältere Log-Einträge gingen verloren.',
-        extend: 'Verlängern', minutes: 'Minuten', expires: 'Läuft ab', gatewayStop: 'Diesen Dev-Server stoppen?', prune: 'Daten löschen', gatewayPrune: 'Profil, Sessions und Logs dieses gestoppten Gateways unwiderruflich löschen?', gatewayFailed: 'Gateway-Aktion fehlgeschlagen.',
+        extend: 'Verlängern', minutes: 'Minuten', expires: 'Läuft ab', gatewayStop: 'Diesen Dev-Server stoppen?', prune: 'Daten löschen', gatewayPrune: 'Temporäre Daten, Profil, Sessions und Logs dieses gestoppten Gateways unwiderruflich löschen?', gatewayFailed: 'Gateway-Aktion fehlgeschlagen.',
       },
     };
     function Icon({ size, active }) {
@@ -254,6 +256,9 @@ window.__ModuleLoader__.load({
                     ['stopped', 'failed'].includes(item.status) && !item.retainData && h('button', { type: 'button', className: 'dtm-stop danger', disabled: !!busy, 'aria-label': `${t('prune')}: ${item.label || item.id}`, onClick: () => gatewayAction('gateway-prune', item.id) }, t('prune'))),
                   item.expiresAt && h('span', { className: 'dtm-gateway-meta', title: `${t('expires')}: ${item.expiresAt}` }, `${t('expires')}: ${new Date(item.expiresAt).toLocaleString()}`)),
                 item.startCommand && h('div', { className: 'dtm-gateway-meta', title: item.startCommand }, `${t('command')}: ${item.startCommand}`),
+                item.dataDir && h('div', { className: 'dtm-gateway-meta', title: item.dataDir, role: item.cleanupError ? 'status' : undefined },
+                  `${t('tempData')}: ${item.dataDir} · ${t(item.cleanupError ? 'blockedCleanup' : item.cleanupPending ? 'pendingCleanup' : item.retainData ? 'kept' : item.cleanupOnArchive ? 'onArchive' : 'manual')}`),
+                item.cleanupError && h('div', { className: 'dtm-notice error', role: 'alert' }, item.cleanupError),
                 item.reason && h('div', { className: 'dtm-notice', role: 'status' }, item.reason),
                 gatewayLogs?.id === item.id && h('div', null,
                   gatewayLogs.lossy && h('div', { className: 'dtm-notice', role: 'status' }, t('lostLogs')),
