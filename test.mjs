@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { apply, protectedProcess, workspaceHint, SCAN, KILL } from './index.js';
+import { apply, inventory as makeInventory, protectedProcess, workspaceHint, SCAN, KILL } from './index.js';
 
 const workspaces = [{ id: 'w1', path: 'C:\\Projects\\alpha', title: 'Alpha' }, { id: 'w2', path: 'C:\\Projects\\beta', title: 'Beta' }];
 assert.equal(workspaceHint({ command: 'node C:\\Projects\\alpha\\node_modules\\vite.js' }, workspaces)?.id, 'w1');
@@ -12,10 +12,51 @@ assert.equal(protectedProcess(byPid.get(40), byPid, 50), true);
 assert.equal(protectedProcess(byPid.get(90), byPid, 50), false);
 assert.equal(protectedProcess(proc(70, 0, '12000000000000000', 'node deepseek-harness-production/apps/cli/lib/bin.js web'), byPid, 50), true);
 assert.equal(protectedProcess(proc(70, 0, ''), byPid, 50), true);
+const root = { pid: 101, started: '639000000000000100' };
+const ownedJob = { id: 'pwsh-1', owner: 's1', label: 'start server', status: 'running', processRoot: root };
+const attributionCtx = {
+  workspaceRegistry: { archivedSessionIds: [], list: () => [{ title: 'Alpha', path: 'C:\\Projects\\alpha', sessionIds: ['s1'] }] },
+  agents: { get: () => undefined },
+  get: key => key === 'jobs' ? { list: () => [ownedJob] } : undefined,
+};
+const attributionSessions = [{ sessionId: 's1', cwd: 'C:\\Projects\\alpha', running: false }];
+const attributionScan = { processes: [
+  proc(101, 0, root.started), proc(102, 101, '639000000000000200'), proc(103, 102, '639000000000000300'),
+  proc(104, 0, '639000000000000400'), proc(105, 101, '639000000000000050'),
+], listeners: [103, 104, 105].map(pid => ({ pid, port: 3100 + pid, address: '127.0.0.1' })) };
+const attributed = makeInventory(attributionCtx, attributionSessions, attributionScan).processes;
+const linked = attributed.find(row => row.pid === 103);
+assert.deepEqual({ confidence: linked.confidence, sessionId: linked.sessionId, jobId: linked.jobId },
+  { confidence: 'confirmed', sessionId: 's1', jobId: 'pwsh-1' });
+assert.equal(attributed.find(row => row.pid === 104).confidence, 'unknown');
+assert.equal(attributed.find(row => row.pid === 105).confidence, 'unknown', 'an older child cannot belong to a newly created root');
+attributionScan.processes[0] = proc(101, 0, '639000000000000999');
+assert.equal(makeInventory(attributionCtx, attributionSessions, attributionScan).processes.find(row => row.pid === 103).confidence, 'unknown', 'PID reuse invalidates the anchor');
+attributionScan.processes[0] = proc(101, 0, root.started);
+attributionScan.processes[1] = proc(102, 101, '639000000000000500');
+assert.equal(makeInventory(attributionCtx, attributionSessions, attributionScan).processes.find(row => row.pid === 103).confidence, 'unknown', 'a recycled intermediate parent must not claim its older child');
+attributionScan.processes[1] = proc(102, 101, '639000000000000200');
+const conflictingCtx = { ...attributionCtx, get: key => key === 'jobs' ? { list: () => [ownedJob, { ...ownedJob, id: 'pwsh-2' }] } : undefined };
+assert.equal(makeInventory(conflictingCtx, attributionSessions, attributionScan).processes.find(row => row.pid === 103).confidence, 'unknown', 'two jobs must not claim the same root');
+const terminalConflict = {
+  ...attributionCtx,
+  agents: { get: id => id === 's2' ? {} : undefined },
+  get: key => key === 'jobs' ? { list: () => [ownedJob] } : key === 'terminals' ? { list: () => [{ sessionId: 'terminal-1', status: { kind: 'running' }, pid: 103 }] } : undefined,
+};
+assert.equal(makeInventory(terminalConflict, [...attributionSessions, { sessionId: 's2', running: false }], attributionScan).processes.find(row => row.pid === 103).confidence,
+  'unknown', 'conflicting terminal and job owners cannot confirm a process');
+ownedJob.status = 'completed';
+assert.equal(makeInventory(attributionCtx, attributionSessions, attributionScan).processes.find(row => row.pid === 103).confidence, 'unknown', 'settled jobs cannot claim a listener');
+
 if (process.platform === 'win32') {
   const scan = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', SCAN], { timeout: 12000, maxBuffer: 4 * 1024 * 1024, windowsHide: true, encoding: 'utf8' }));
   assert.ok(Array.isArray(scan.processes) && Array.isArray(scan.listeners));
   assert.ok(scan.processes.some(row => row.pid === process.pid && /^\d{15,20}$/.test(row.started)));
+  const exactScan = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    SCAN.replace('$rootPids = @()', `$rootPids = @(${process.pid})`)], { timeout: 12000, maxBuffer: 4 * 1024 * 1024, windowsHide: true, encoding: 'utf8' }));
+  const exactTime = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `(Get-Process -Id ${process.pid}).StartTime.ToUniversalTime().Ticks.ToString()`], { encoding: 'utf8' }).trim();
+  assert.equal(exactScan.processes.find(row => row.pid === process.pid)?.started, exactTime, 'job roots need the full Windows tick identity');
   // A mismatched creation time must never terminate even this test's own process.
   assert.throws(() => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', KILL.replace('__PID__', String(process.pid)).replace('__STARTED__', '00000000000000000')], { timeout: 12000, windowsHide: true, stdio: 'ignore' }));
   const child = spawn(process.execPath, ['-e', "require('node:net').createServer().listen(0,'127.0.0.1',()=>console.log('READY'))"], { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });

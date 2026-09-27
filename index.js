@@ -6,6 +6,7 @@ export const inject = ['connection', 'sessionController', 'workspaceRegistry', '
 const run = promisify(execFile);
 const ROUTE = '/api/dsh-task-master';
 export const SCAN = `$ErrorActionPreference = 'Stop'
+$rootPids = @()
 $processes = @(Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,CreationDate,Name,ExecutablePath,CommandLine | ForEach-Object {
   @{ pid = $_.ProcessId; parent = $_.ParentProcessId; started = $_.CreationDate.ToUniversalTime().Ticks.ToString(); name = $_.Name; path = $_.ExecutablePath; command = $_.CommandLine }
 })
@@ -14,7 +15,7 @@ $listeners = @(Get-NetTCPConnection -State Listen | ForEach-Object {
 })
 $owners = @($listeners | ForEach-Object { $_.pid } | Select-Object -Unique)
 foreach ($entry in $processes) {
-  if ($entry.pid -in $owners) {
+  if ($entry.pid -in $owners -or $entry.pid -in $rootPids) {
     try { $entry.started = (Get-Process -Id $entry.pid -ErrorAction Stop).StartTime.ToUniversalTime().Ticks.ToString() }
     catch { $entry.started = $null }
   }
@@ -68,8 +69,9 @@ export function protectedProcess(process, byPid, self = globalThis.process.pid) 
   return false;
 }
 
-async function scanWindows() {
-  const { stdout } = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', SCAN], {
+async function scanWindows(rootPids = []) {
+  const script = SCAN.replace('$rootPids = @()', `$rootPids = @(${[...new Set(rootPids)].join(',')})`);
+  const { stdout } = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
     windowsHide: true, timeout: 12000, maxBuffer: 4 * 1024 * 1024,
   });
   const value = JSON.parse(stdout);
@@ -79,13 +81,27 @@ async function scanWindows() {
   };
 }
 
-function inventory(ctx, sessions, scan) {
+// A job owns its Windows launcher, not every PID that happens to use the same port or workspace.
+export function jobForProcess(process, byPid, roots) {
+  const seen = new Set();
+  let current = process;
+  while (current?.started && !seen.has(current.pid)) {
+    seen.add(current.pid);
+    const root = roots.get(current.pid);
+    if (root !== undefined) return root?.started === current.started ? root : undefined;
+    const parent = byPid.get(current.parent);
+    current = parent?.started && BigInt(parent.started) < BigInt(current.started) ? parent : undefined;
+  }
+}
+
+export function inventory(ctx, sessions, scan) {
   const workspaces = ctx.workspaceRegistry.list();
   const archivedIds = new Set(ctx.workspaceRegistry.archivedSessionIds ?? []);
   const byPid = new Map(scan.processes.map(process => [process.pid, process]));
   const workspaceOf = id => workspaces.find(workspace => workspace.sessionIds.includes(id));
   const rows = [];
   const ownedPids = new Map();
+  const roots = new Map();
   const sessionRows = [];
   for (const session of sessions) {
     const agent = ctx.agents.get(session.sessionId);
@@ -103,6 +119,12 @@ function inventory(ctx, sessions, scan) {
       ],
     });
     for (const terminal of terminals) if (terminal.pid) ownedPids.set(terminal.pid, session.sessionId);
+    for (const job of jobs) {
+      const root = job.processRoot;
+      if (!Number.isSafeInteger(root?.pid) || root.pid <= 0 || !/^\d{15,20}$/.test(root.started)) continue;
+      const owner = { ...root, sessionId: session.sessionId, jobId: job.id, status: job.status };
+      roots.set(root.pid, roots.has(root.pid) ? null : owner);
+    }
   }
   const grouped = new Map();
   for (const listener of scan.listeners) {
@@ -114,11 +136,15 @@ function inventory(ctx, sessions, scan) {
   for (const [pid, ports] of grouped) {
     const process = byPid.get(pid);
     if (!process?.started) continue;
-    const sessionId = ownedPids.get(pid);
+    const job = jobForProcess(process, byPid, roots);
+    const terminalOwner = ownedPids.get(pid);
+    const conflict = job && terminalOwner && job.sessionId !== terminalOwner;
+    const sessionId = conflict ? null : job?.sessionId ?? terminalOwner;
     const workspace = sessionId ? workspaceOf(sessionId) : workspaceHint(process, workspaces);
     rows.push({ pid, started: process.started, name: process.name, ports: [...ports].sort(),
       confidence: sessionId ? 'confirmed' : workspace ? 'suspected' : 'unknown',
       sessionId: sessionId ?? null, workspace: workspace?.title ?? null,
+      jobId: conflict ? null : job?.jobId ?? null, jobStatus: conflict ? null : job?.status ?? null,
       protected: protectedProcess(process, byPid),
     });
   }
@@ -209,8 +235,12 @@ export function apply(ctx) {
         for (const agent of ctx.agents.list()) if (!visible.has(agent.id)) sessions.push({
           sessionId: agent.id, cwd: agent.session.header.cwd, running: agent.status === 'running',
         });
+        const jobs = ctx.get('jobs');
+        const rootPids = jobs ? sessions.flatMap(session => jobs.list(session.sessionId)
+          .filter(job => job.owner === session.sessionId && ['running', 'stopping'].includes(job.status))
+          .map(job => job.processRoot?.pid).filter(pid => Number.isSafeInteger(pid) && pid > 0)) : [];
         let scan = { processes: [], listeners: [] }, scanError = null;
-        try { scan = await scanWindows(); } catch (error) { scanError = error instanceof Error ? error.message : String(error); }
+        try { scan = await scanWindows(rootPids); } catch (error) { scanError = error instanceof Error ? error.message : String(error); }
         let gateways = [], gatewayError = null;
         const service = ctx.get('devGateways');
         try {

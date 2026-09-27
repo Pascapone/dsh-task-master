@@ -170,4 +170,13 @@ assert.ok(select(panel(render(), 'gateways'), node => node.props.role === 'statu
 hooks[0].gateways[0].status = 'stopped';
 await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.props['aria-label'] === 'prune: Preview')[0].props.onClick();
 assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-prune', id: 'g1' });
+hooks[0].processes[0] = { ...hooks[0].processes[0], confidence: 'confirmed', sessionId: 'live-1', jobId: 'job-1', jobStatus: 'running' };
+const linkedProcess = panel(render(), 'processes');
+assert.match(JSON.stringify(linkedProcess), /job job-1/);
+const linkedStop = select(linkedProcess, node => node.tag === 'button' && node.props['aria-label'] === 'stop job job-1')[0];
+assert.equal(linkedStop.props.disabled, false);
+await linkedStop.props.onClick();
+assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'job', sessionId: 'live-1', id: 'job-1' }, 'linked process stops via the owner-fenced job, never raw PID');
+hooks[0].processes[0].jobStatus = 'stopping';
+assert.equal(select(panel(render(), 'processes'), node => node.props['aria-label']?.includes('job job-1'))[0].props.disabled, true);
 console.log('Task Master client view/filter/gateway checks passed');

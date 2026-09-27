@@ -1,6 +1,6 @@
 {
   "name": "@pascapone/dsh-task-master",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "DSH Task Master: live sessions, managed tasks and listening processes with honest ownership and guarded stop controls.",
