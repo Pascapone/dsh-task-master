@@ -30,9 +30,12 @@ if (process.platform === 'win32') {
 }
 let route;
 let killed;
+let gatewayService;
+let rejected;
+const calls = [];
 const job = { id: 'bash-1', label: 'dev server', status: 'running', owner: 's1' };
 apply({
-  connection: { fetch: { register: value => { route = value; return () => {}; } } },
+  connection: { operator: { id: 'operator' }, admit: () => rejected ? { rejection: 403 } : { peer: { id: 'operator' } }, fetch: { register: value => { route = value; return () => {}; } } },
   sessionController: { list: async () => ({ items: [
     { sessionId: 's1', cwd: 'C:\\Projects\\alpha', running: false },
     { sessionId: 's2', cwd: 'C:\\Projects\\alpha', running: false },
@@ -40,7 +43,7 @@ apply({
   ] }) },
   workspaceRegistry: { archivedSessionIds: ['s2'], list: () => [{ id: 'w1', title: 'Alpha', path: 'C:\\Projects\\alpha', sessionIds: ['s1', 's2', 's3'] }] },
   agents: { get: id => id === 's1' ? { status: 'idle' } : undefined, list: () => [] },
-  get: key => key === 'jobs' ? { list: () => [job], kill: (...args) => { killed = args; return 'requested'; } } : undefined,
+  get: key => key === 'jobs' ? { list: () => [job], kill: (...args) => { killed = args; return 'requested'; } } : key === 'devGateways' ? gatewayService : undefined,
   effect: register => register(),
 });
 assert.equal(route.path, '/api/dsh-task-master');
@@ -58,6 +61,42 @@ assert.equal(inventory.sessions[2].id, 's3');
 assert.equal(inventory.sessions[2].archived, false);
 assert.equal(inventory.sessions[2].available, false);
 assert.ok(Array.isArray(inventory.processes));
+assert.deepEqual(inventory.gateways, [], 'missing optional service leaves the old inventory available');
+assert.equal(inventory.gatewayError, null);
+const post = input => route.fetch(new Request('http://localhost/api/dsh-task-master', { method: 'POST', body: JSON.stringify(input) }));
+const missing = await post({ kind: 'gateway-stop', id: 'g1' });
+assert.equal(missing.status, 503);
+gatewayService = {
+  list: async (...args) => { calls.push(['list', ...args]); return [{ id: 'g1', url: 'http://localhost:3187', status: 'running', workspace: 'Alpha', bundles: [], label: 'Preview', expiresAt: null, ownerSessionId: 's1' }]; },
+  stop: async (...args) => { calls.push(['stop', ...args]); return 'stopped'; },
+  extend: async (...args) => { calls.push(['extend', ...args]); return 'extended'; },
+  logs: async (...args) => { calls.push(['logs', ...args]); return { text: 'ready', next: 5, lossy: false }; },
+  prune: async (...args) => { calls.push(['prune', ...args]); return { pruned: true }; },
+};
+const withGateways = await (await route.fetch(new Request('http://localhost/api/dsh-task-master'))).json();
+assert.equal(withGateways.gateways[0].id, 'g1');
+assert.deepEqual(calls.at(-1), ['list', { operator: true }]);
+gatewayService.list = async () => { throw new Error('gateway unavailable'); };
+const degraded = await (await route.fetch(new Request('http://localhost/api/dsh-task-master'))).json();
+assert.equal(degraded.gatewayError, 'gateway unavailable');
+assert.deepEqual(degraded.gateways, []);
+assert.equal(degraded.sessions.length, 3);
+rejected = true;
+assert.equal((await post({ kind: 'gateway-stop', id: 'g1' })).status, 403);
+assert.equal((await post({ kind: 'job', sessionId: 's1', id: 'bash-1' })).status, 403);
+assert.equal(calls.filter(call => call[0] === 'stop').length, 0);
+rejected = false;
+assert.equal((await post({ kind: 'gateway-stop', id: 'g1' })).status, 200);
+assert.equal((await post({ kind: 'gateway-extend', id: 'g1', minutes: 30 })).status, 200);
+assert.equal((await post({ kind: 'gateway-logs', id: 'g1', from: 0 })).status, 200);
+assert.equal((await post({ kind: 'gateway-prune', id: 'g1' })).status, 200);
+assert.deepEqual(calls.slice(-4), [
+  ['stop', 'g1', { operator: true }],
+  ['extend', 'g1', 30, { operator: true }],
+  ['logs', 'g1', 0, { operator: true }],
+  ['prune', 'g1', { operator: true }],
+]);
+assert.equal((await post({ kind: 'gateway-extend', id: 'g1', minutes: 0 })).status, 400);
 const response = await route.fetch(new Request('http://localhost/api/dsh-task-master', { method: 'POST', body: JSON.stringify({ kind: 'job', sessionId: 's1', id: 'bash-1' }) }));
 assert.equal(response.status, 200);
 assert.deepEqual(killed, ['bash-1', 's1', 'Beendet im Task-Manager']);

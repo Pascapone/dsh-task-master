@@ -4,6 +4,7 @@ import { runInNewContext } from 'node:vm';
 
 // Exercise the real Client module's view/filter handlers without launching a browser or an OS process.
 let bundle;
+const posted = [];
 const slots = [];
 const hooks = [];
 let cursor = 0;
@@ -24,7 +25,13 @@ const React = {
   useEffect: () => { cursor++; },
 };
 runInNewContext(readFileSync(new URL('./client.js', import.meta.url), 'utf8'), {
-  window: { __ModuleLoader__: { load: value => { bundle = value; } } },
+  window: { __ModuleLoader__: { load: value => { bundle = value; } }, confirm: () => true },
+  fetch: async (_url, options) => {
+    if (!options?.body) return { ok: true, json: async () => hooks[0] };
+    const body = JSON.parse(options.body);
+    posted.push(body);
+    return { ok: true, json: async () => ({ result: body.kind === 'gateway-logs' ? { text: 'ready', next: 5, lossy: true } : 'ok' }) };
+  },
 }, { filename: 'client.js' });
 bundle.factory(() => React).apply({
   effect: fn => fn(),
@@ -52,12 +59,22 @@ hooks[0] = {
     { id: 'turn-5', workspace: 'Epsilon', running: true, available: true, archived: false, jobs: [], terminals: [] },
   ],
   processes: [{ pid: 42, started: '12345678901234567', name: 'example', ports: ['127.0.0.1:8000'], confidence: 'unknown', protected: false, workspace: null }],
+  gateways: [{ id: 'g1', label: 'Preview', status: 'ready', workspace: 'Alpha', bundles: ['demo'], url: 'http://127.0.0.1:3190/api/dsh-dev-gateways/open?id=g1', expiresAt: null, ownerSessionId: 'live-1' }],
 };
 let tree = render();
 assert.equal(rows(tree).length, 4, 'all unarchived sessions, including inactive history, must be shown');
 assert.equal(panel(tree, 'processes').props.hidden, true);
 const tabs = select(tree, node => node.props.role === 'tab');
-assert.equal(tabs.length, 2);
+assert.equal(tabs.length, 3);
+let focused;
+tabs[1].props.onKeyDown({ key: 'ArrowRight', preventDefault() {}, currentTarget: { parentElement: { querySelector: selector => ({ focus: () => { focused = selector; } }) } } });
+assert.equal(focused, '[data-task-master-tab="gateways"]');
+assert.equal(panel(render(), 'gateways').props.hidden, false);
+tabs[2].props.onKeyDown({ key: 'ArrowRight', preventDefault() {}, currentTarget: { parentElement: { querySelector: selector => ({ focus: () => { focused = selector; } }) } } });
+assert.equal(focused, '[data-task-master-tab="sessions"]');
+tabs[0].props.onKeyDown({ key: 'End', preventDefault() {}, currentTarget: { parentElement: { querySelector: selector => ({ focus: () => { focused = selector; } }) } } });
+assert.equal(focused, '[data-task-master-tab="gateways"]');
+tabs[0].props.onClick();
 tabs[1].props.onClick();
 tree = render();
 assert.equal(panel(tree, 'sessions').props.hidden, true);
@@ -85,4 +102,21 @@ select(render(), node => node.props.id === 'dtm-tab-processes')[0].props.onClick
 tree = render();
 select(tree, node => node.tag === 'button' && node.props.className === 'dtm-chip' && node.children[0] === 'confirmed')[0].props.onClick();
 assert.equal(select(panel(render(), 'processes'), node => node.props.className === 'dtm-process').length, 0, 'confidence filter must hide non-matching listeners');
-console.log('Task Master client view/filter checks passed');
+tree = render();
+select(tree, node => node.props.id === 'dtm-tab-gateways')[0].props.onClick();
+tree = render();
+const gateway = panel(tree, 'gateways');
+assert.equal(gateway.props.hidden, false);
+assert.equal(select(gateway, node => node.props.className === 'dtm-gateway').length, 1);
+assert.equal(select(gateway, node => node.tag === 'a')[0].props.href, 'http://127.0.0.1:3190/api/dsh-dev-gateways/open?id=g1');
+await select(gateway, node => node.tag === 'button' && node.props['aria-label'] === 'logs: Preview')[0].props.onClick();
+assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-logs', id: 'g1', from: 0 });
+assert.equal(select(panel(render(), 'gateways'), node => node.tag === 'pre')[0].children[0], 'ready');
+await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.props['aria-label'] === 'extend: Preview')[0].props.onClick();
+assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-extend', id: 'g1', minutes: 30 });
+await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.props['aria-label'] === 'stop: Preview')[0].props.onClick();
+assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-stop', id: 'g1' });
+hooks[0].gateways[0].status = 'stopped';
+await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.props['aria-label'] === 'prune: Preview')[0].props.onClick();
+assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-prune', id: 'g1' });
+console.log('Task Master client view/filter/gateway checks passed');

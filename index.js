@@ -180,7 +180,28 @@ export function apply(ctx) {
     async fetch(request) {
       try {
         if (request.method === 'POST') {
+          const admission = ctx.connection.admit(request);
+          if ('rejection' in admission) return Response.json({ error: 'Betreiberzugriff erforderlich' }, { status: admission.rejection });
+          if (admission.peer.id !== ctx.connection.operator.id) return Response.json({ error: 'Betreiberzugriff erforderlich' }, { status: 403 });
           const input = await request.json();
+          if (['gateway-stop', 'gateway-extend', 'gateway-logs', 'gateway-prune'].includes(input?.kind)) {
+            const gateways = ctx.get('devGateways');
+            if (!gateways) return Response.json({ error: 'Dev-Gateway-Dienst nicht verfügbar' }, { status: 503 });
+            if (typeof input.id !== 'string' || !input.id.trim()) throw new Error('Ungültige Gateway-ID');
+            const operator = { operator: true };
+            let result;
+            if (input.kind === 'gateway-stop') result = await gateways.stop(input.id, operator);
+            if (input.kind === 'gateway-prune') result = await gateways.prune(input.id, operator);
+            if (input.kind === 'gateway-extend') {
+              if (!Number.isSafeInteger(input.minutes) || input.minutes <= 0) throw new Error('Ungültige Verlängerung');
+              result = await gateways.extend(input.id, input.minutes, operator);
+            }
+            if (input.kind === 'gateway-logs') {
+              if (!(typeof input.from === 'string' && input.from.length > 0) && !(Number.isSafeInteger(input.from) && input.from >= 0)) throw new Error('Ungültiger Log-Cursor');
+              result = await gateways.logs(input.id, input.from, operator);
+            }
+            return Response.json({ result }, { headers: { 'cache-control': 'no-store' } });
+          }
           return Response.json({ result: await stop(ctx, input) }, { headers: { 'cache-control': 'no-store' } });
         }
         const sessions = [...(await ctx.sessionController.list({}, request.signal)).items];
@@ -190,7 +211,13 @@ export function apply(ctx) {
         });
         let scan = { processes: [], listeners: [] }, scanError = null;
         try { scan = await scanWindows(); } catch (error) { scanError = error instanceof Error ? error.message : String(error); }
-        return Response.json({ ...inventory(ctx, sessions, scan), scanError }, { headers: { 'cache-control': 'no-store' } });
+        let gateways = [], gatewayError = null;
+        const service = ctx.get('devGateways');
+        try {
+          if (service) gateways = await service.list({ operator: true });
+          if (!Array.isArray(gateways)) throw new Error('Ungültiges Gateway-Inventar');
+        } catch (error) { gateways = []; gatewayError = error instanceof Error ? error.message : String(error); }
+        return Response.json({ ...inventory(ctx, sessions, scan), scanError, gateways, gatewayError, gatewayEnabled: !!service }, { headers: { 'cache-control': 'no-store' } });
       } catch (error) {
         return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
       }
