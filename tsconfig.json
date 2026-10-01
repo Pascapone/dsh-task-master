@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "lib": ["ES2024"], "types": ["node"], "strict": true,
+    "verbatimModuleSyntax": true, "skipLibCheck": true, "noEmit": true,
+    "rootDirs": [".", "lib"], "allowImportingTsExtensions": true
+  },
+  "include": ["index.ts", "host-types.ts", "wire.ts", "scan.ts", "*.test.ts", "test.ts"],
+  "exclude": ["lib", "node_modules", ".test-build"]
+}

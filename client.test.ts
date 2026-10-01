@@ -2,52 +2,63 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
+import type { ClientBundleRegistration } from '@deepseek-ai/dsh-client-modules/client';
+import type { ClientInventory, ClientGateway } from './wire.js';
+type FixtureKeyEvent = { key: string; preventDefault(): void; currentTarget: { parentElement: { querySelector(selector: string): { focus(): void } } } };
+type FixtureProps = Record<string, unknown> & {
+  'aria-label'?: string;
+  onClick(): unknown;
+  onChange(event: { target: { checked?: boolean; value?: string } }): unknown;
+  onKeyDown(event: FixtureKeyEvent): unknown;
+};
+type FixtureElement = { tag: unknown; props: FixtureProps; children: unknown[] };
+type FixtureInventory = ClientInventory & { gateways: (ClientGateway & { loginUrl?: string; serverUrl?: string })[] };
 // Exercise the real Client module's view/filter handlers without launching a browser or an OS process.
-let bundle;
-const posted = [];
-const slots = [];
-const hooks = [];
+let bundle!: ClientBundleRegistration;
+const posted: Record<string, unknown>[] = [];
+const slots: [{ name: string }, (...args: unknown[]) => unknown][] = [];
+const hooks = [] as unknown as unknown[] & { 0: FixtureInventory };
 let cursor = 0;
 const React = {
-  createElement: (tag, props, ...children) => ({ tag, props: props ?? {}, children }),
+  createElement: (tag: unknown, props: FixtureProps | null, ...children: unknown[]): FixtureElement => ({ tag, props: (props ?? {}) as FixtureProps, children }),
   useSyncExternalStore: () => {},
-  useState(initial) {
+  useState(initial: unknown) {
     const index = cursor++;
     if (!(index in hooks)) hooks[index] = initial;
-    return [hooks[index], value => { hooks[index] = typeof value === 'function' ? value(hooks[index]) : value; }];
+    return [hooks[index], (value: unknown) => { hooks[index] = typeof value === 'function' ? (value as (previous: unknown) => unknown)(hooks[index]) : value; }];
   },
-  useRef(initial) {
+  useRef(initial: unknown) {
     const index = cursor++;
     if (!(index in hooks)) hooks[index] = { current: initial };
     return hooks[index];
   },
-  useCallback: fn => { cursor++; return fn; },
+  useCallback: (fn: unknown) => { cursor++; return fn; },
   useEffect: () => { cursor++; },
 };
-runInNewContext(readFileSync(new URL('./client.js', import.meta.url), 'utf8'), {
-  window: { __ModuleLoader__: { load: value => { bundle = value; } }, confirm: () => true },
-  fetch: async (_url, options) => {
+runInNewContext(readFileSync(new URL('./lib/client.js', import.meta.url), 'utf8'), {
+  window: { __ModuleLoader__: { load: (value: ClientBundleRegistration) => { bundle = value; } }, confirm: () => true },
+  fetch: async (_url: unknown, options?: { body?: string }) => {
     if (!options?.body) return { ok: true, json: async () => hooks[0] };
-    const body = JSON.parse(options.body);
+    const body = JSON.parse(options.body) as Record<string, unknown>;
     posted.push(body);
     return { ok: true, json: async () => ({ result: body.kind === 'gateway-logs' ? { text: body.from === 0 ? 'ready' : body.from === 5 ? '\nnext' : '', next: body.from === 0 ? 5 : 10, hasMore: body.from === 0, lossy: body.from === 0 } : 'ok' }) };
   },
 }, { filename: 'client.js' });
-bundle.factory(() => React).apply({
-  effect: fn => fn(),
-  locale: { register: () => () => {}, bind: () => key => key },
-  slots: { inject: (_slot, fn) => fn(), register: (options, Component) => { slots.push([options, Component]); return () => {}; } },
+(bundle.factory((() => React) as unknown as Parameters<ClientBundleRegistration['factory']>[0]) as { apply(ctx: unknown): void }).apply({
+  effect: (fn: () => unknown) => fn(),
+  locale: { register: () => () => {}, bind: () => (key: string) => key },
+  slots: { inject: (_slot: string, fn: () => unknown) => fn(), register: (options: { name: string }, Component: (...args: unknown[]) => unknown) => { slots.push([options, Component]); return () => {}; } },
 });
-const Panel = slots.find(([options]) => options.name === 'main')[1];
+const Panel = slots.find(([options]) => options.name === 'main')![1];
 const render = () => { cursor = 0; return Panel(); };
-function all(node) {
+function all(node: unknown): FixtureElement[] {
   if (Array.isArray(node)) return node.flatMap(all);
   if (!node || typeof node !== 'object' || !('tag' in node)) return [];
-  return [node, ...node.children.flatMap(all)];
+  return [node as FixtureElement, ...(node as FixtureElement).children.flatMap(all)];
 }
-const select = (tree, predicate) => all(tree).filter(predicate);
-const panel = (tree, id) => select(tree, node => node.props.id === `dtm-panel-${id}`)[0];
-const rows = tree => select(panel(tree, 'sessions'), node => node.props.className === 'dtm-session');
+const select = (tree: unknown, predicate: (node: FixtureElement) => unknown) => all(tree).filter(predicate);
+const panel = (tree: unknown, id: string) => select(tree, node => node.props.id === `dtm-panel-${id}`)[0];
+const rows = (tree: unknown) => select(panel(tree, 'sessions'), node => node.props.className === 'dtm-session');
 render();
 hooks[0] = {
   scannedAt: Date.now(), scanError: null,
@@ -66,7 +77,7 @@ assert.equal(rows(tree).length, 4, 'all unarchived sessions, including inactive 
 assert.equal(panel(tree, 'processes').props.hidden, true);
 const tabs = select(tree, node => node.props.role === 'tab');
 assert.equal(tabs.length, 3);
-let focused;
+let focused: string | undefined;
 tabs[1].props.onKeyDown({ key: 'ArrowRight', preventDefault() {}, currentTarget: { parentElement: { querySelector: selector => ({ focus: () => { focused = selector; } }) } } });
 assert.equal(focused, '[data-task-master-tab="gateways"]');
 assert.equal(panel(render(), 'gateways').props.hidden, false);
@@ -142,20 +153,20 @@ await extendButton.props.onClick();
 assert.equal(posted.length, postCount, 'out-of-bounds extension must not submit');
 minuteInput.props.onChange({ target: { value: '30' } });
 await select(gateway, node => node.tag === 'button' && node.props['aria-label'] === 'logs: Preview')[0].props.onClick();
-assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-logs', id: 'g1', from: 0 });
+assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1)!)), { kind: 'gateway-logs', id: 'g1', from: 0 });
 assert.equal(select(panel(render(), 'gateways'), node => node.tag === 'pre')[0].children[0], 'ready');
 await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.children.includes('moreLogs'))[0].props.onClick();
-assert.equal(posted.at(-1).from, 5);
+assert.equal(posted.at(-1)!.from, 5);
 assert.equal(select(panel(render(), 'gateways'), node => node.tag === 'pre')[0].children[0], 'ready\nnext');
 assert.equal(select(panel(render(), 'gateways'), node => node.tag === 'button' && node.children.includes('moreLogs')).length, 0);
 assert.ok(select(panel(render(), 'gateways'), node => node.children.includes('lostLogs')).length, 'lossy warning survives pagination');
 await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.children.includes('refreshLogs'))[0].props.onClick();
-assert.equal(posted.at(-1).from, 10);
+assert.equal(posted.at(-1)!.from, 10);
 assert.equal(select(panel(render(), 'gateways'), node => node.tag === 'pre')[0].children[0], 'ready\nnext');
 await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.props['aria-label'] === 'extend: Preview')[0].props.onClick();
-assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-extend', id: 'g1', minutes: 30 });
+assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1)!)), { kind: 'gateway-extend', id: 'g1', minutes: 30 });
 await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.props['aria-label'] === 'stop: Preview')[0].props.onClick();
-assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-stop', id: 'g1' });
+assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1)!)), { kind: 'gateway-stop', id: 'g1' });
 for (const state of ['stopping', 'stopped', 'failed', 'unknown']) {
   hooks[0].gateways[0].status = state;
   for (const action of ['extend', 'stop']) {
@@ -177,14 +188,14 @@ hooks[0].gateways[0].reason = 'Server exited: missing entrypoint';
 assert.ok(select(panel(render(), 'gateways'), node => node.props.role === 'status' && node.children.includes('Server exited: missing entrypoint')).length, 'failure reason must be visible');
 hooks[0].gateways[0].status = 'stopped';
 await select(panel(render(), 'gateways'), node => node.tag === 'button' && node.props['aria-label'] === 'prune: Preview')[0].props.onClick();
-assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'gateway-prune', id: 'g1' });
+assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1)!)), { kind: 'gateway-prune', id: 'g1' });
 hooks[0].processes[0] = { ...hooks[0].processes[0], confidence: 'confirmed', sessionId: 'live-1', jobId: 'job-1', jobStatus: 'running' };
 const linkedProcess = panel(render(), 'processes');
 assert.match(JSON.stringify(linkedProcess), /job job-1/);
 const linkedStop = select(linkedProcess, node => node.tag === 'button' && node.props['aria-label'] === 'stop job job-1')[0];
 assert.equal(linkedStop.props.disabled, false);
 await linkedStop.props.onClick();
-assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1))), { kind: 'job', sessionId: 'live-1', id: 'job-1' }, 'linked process stops via the owner-fenced job, never raw PID');
+assert.deepEqual(JSON.parse(JSON.stringify(posted.at(-1)!)), { kind: 'job', sessionId: 'live-1', id: 'job-1' }, 'linked process stops via the owner-fenced job, never raw PID');
 hooks[0].processes[0].jobStatus = 'stopping';
 assert.equal(select(panel(render(), 'processes'), node => node.props['aria-label']?.includes('job job-1'))[0].props.disabled, true);
 console.log('Task Master client view/filter/gateway checks passed');

@@ -10,6 +10,8 @@ Clone this repository and add its local directory as a bundle to the intended DS
 
 ```powershell
 git clone https://github.com/Pascapone/dsh-task-master.git
+pnpm --dir dsh-task-master install --frozen-lockfile
+pnpm --dir dsh-task-master run build
 dsh plugin --profile web add "link:$((Resolve-Path ./dsh-task-master).Path)"
 ```
 
@@ -23,4 +25,6 @@ Use your own profile name in place of `web`. The package is `@pascapone/dsh-task
 - A confirmation is required before stopping. An unknown or suspected listener could belong to another application; inspect it before confirming. Browser access to this route inherits DSH's operator-level authentication, not separate per-user OS-process permissions. Do not expose the Web UI to untrusted operators.
 - Process discovery requires Windows PowerShell (`Get-CimInstance`, `Get-NetTCPConnection`) and permission to inspect the relevant processes. Job ancestry requires a DSH build exposing `JobView.processRoot`; older builds simply keep the previous unknown/suspected behavior. Detached descendants whose launcher exited, non-listening processes, and jobs without a process root cannot be attributed from a past job ID alone.
 
-Run `npm test` to exercise the Client's tabs and filters, Host attribution and endpoint, and (on Windows) a temporary, test-owned TCP server with process-identity-checked termination. The test never targets existing applications.
+Run `pnpm run check` for strict Host/Client/test typechecks, compilation, the Client's tabs and filters, Host attribution and endpoint, and (on Windows) a temporary, test-owned TCP server with process-identity-checked termination. The test never targets existing applications. The existing scenarios and assertions remain unchanged; the listener program is compiled from TypeScript. Additional checks cover unknown JSON, exact string timestamps and classic-script output without ESM imports.
+
+The optional gateway contract comes from a checked-in provider package used only as a development dependency; building this repository does not need a sibling checkout or an installed gateway service. The optional Development `JobView.processRoot` field is declared separately from the published SDK. The existing English/German dictionaries remain unchanged: a narrow type adaptation accounts for the SDK's en/zh-only overload while its actual runtime accepts registered language keys.

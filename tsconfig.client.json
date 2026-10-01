@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext", "moduleResolution": "Bundler", "moduleDetection": "legacy",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"], "types": ["react"],
+    "noEmit": false, "allowImportingTsExtensions": false,
+    "rootDir": ".", "outDir": "lib", "noEmitOnError": true
+  },
+  "include": ["client.ts", "client-types.d.ts"]
+}

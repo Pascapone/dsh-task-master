@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.host.json",
+  "compilerOptions": {
+    "rootDir": "fixtures", "outDir": ".test-build", "declaration": false,
+    "moduleDetection": "legacy"
+  },
+  "include": ["fixtures/*.ts"]
+}

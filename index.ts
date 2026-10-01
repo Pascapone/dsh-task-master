@@ -1,3 +1,11 @@
+import type { Context } from '@deepseek-ai/cordis';
+import type { SessionId } from '@deepseek-ai/dsh-session';
+import type { TerminalSessionId } from '@deepseek-ai/dsh-terminal';
+import type { WebTerminalId } from '@deepseek-ai/dsh-api-terminal-controller/types';
+import type { GatewayPublic } from '@pascapone/dsh-dev-gateways';
+import type { InventoryContext, SessionSource, JobOwner } from './host-types.js';
+import type { OsProcess, ProcessScan, Inventory, ProcessRow, SessionRow } from './wire.js';
+import { decodeScan } from './scan.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -44,7 +52,7 @@ try {
   if ([TaskManagerStop]::WaitForSingleObject($handle, 2000) -ne 0) { throw 'Prozessende nicht bestätigt' }
 } finally { [void][TaskManagerStop]::CloseHandle($handle) }`;
 
-export function workspaceHint(process, workspaces) {
+export function workspaceHint<T extends { path: string }>(process: Pick<OsProcess, 'path' | 'command'>, workspaces: readonly T[]) {
   const text = `${process.path ?? ''} ${process.command ?? ''}`.toLowerCase().replaceAll('/', '\\');
   const matches = workspaces.filter(workspace => {
     const path = workspace.path.toLowerCase().replaceAll('/', '\\').replace(/\\+$/, '');
@@ -53,8 +61,8 @@ export function workspaceHint(process, workspaces) {
   return matches.length === 1 ? matches[0] : undefined;
 }
 
-export function protectedProcess(process, byPid, self = globalThis.process.pid) {
-  if (!Number.isSafeInteger(process?.pid) || process.pid <= 4 || !process.started) return true;
+export function protectedProcess(process: OsProcess | undefined, byPid: ReadonlyMap<number, OsProcess>, self = globalThis.process.pid) {
+  if (!process || !Number.isSafeInteger(process?.pid) || process.pid <= 4 || !process.started) return true;
   if (/\\windows\\|\\program files\\windowsapps\\/i.test(process.path ?? '')) return true;
   if (/deepseek-harness|[\\/]apps[\\/]cli[\\/]lib[\\/]bin\.js\s+web|\bdsh(?:\.exe)?\s+web\b/i.test(process.command ?? '')) return true;
   // Protect this Gateway and its ancestors; walking only earlier parents avoids recycled PIDs.
@@ -69,22 +77,19 @@ export function protectedProcess(process, byPid, self = globalThis.process.pid) 
   return false;
 }
 
-async function scanWindows(rootPids = []) {
+async function scanWindows(rootPids: number[] = []): Promise<ProcessScan> {
   const script = SCAN.replace('$rootPids = @()', `$rootPids = @(${[...new Set(rootPids)].join(',')})`);
   const { stdout } = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
     windowsHide: true, timeout: 12000, maxBuffer: 4 * 1024 * 1024,
   });
-  const value = JSON.parse(stdout);
-  return {
-    processes: Array.isArray(value.processes) ? value.processes : [],
-    listeners: Array.isArray(value.listeners) ? value.listeners : [],
-  };
+  const value: unknown = JSON.parse(stdout);
+  return decodeScan(value);
 }
 
 // A job owns its Windows launcher, not every PID that happens to use the same port or workspace.
-export function jobForProcess(process, byPid, roots) {
+export function jobForProcess(process: OsProcess, byPid: ReadonlyMap<number, OsProcess>, roots: ReadonlyMap<number, JobOwner | null>) {
   const seen = new Set();
-  let current = process;
+  let current: OsProcess | undefined = process;
   while (current?.started && !seen.has(current.pid)) {
     seen.add(current.pid);
     const root = roots.get(current.pid);
@@ -94,15 +99,15 @@ export function jobForProcess(process, byPid, roots) {
   }
 }
 
-export function inventory(ctx, sessions, scan) {
+export function inventory(ctx: InventoryContext, sessions: readonly SessionSource[], scan: ProcessScan): Pick<Inventory, 'sessions' | 'processes' | 'scannedAt'> {
   const workspaces = ctx.workspaceRegistry.list();
   const archivedIds = new Set(ctx.workspaceRegistry.archivedSessionIds ?? []);
   const byPid = new Map(scan.processes.map(process => [process.pid, process]));
-  const workspaceOf = id => workspaces.find(workspace => workspace.sessionIds.includes(id));
-  const rows = [];
-  const ownedPids = new Map();
-  const roots = new Map();
-  const sessionRows = [];
+  const workspaceOf = (id: SessionId) => workspaces.find(workspace => workspace.sessionIds.includes(id));
+  const rows: ProcessRow[] = [];
+  const ownedPids = new Map<number, SessionId>();
+  const roots = new Map<number, JobOwner | null>();
+  const sessionRows: SessionRow[] = [];
   for (const session of sessions) {
     const agent = ctx.agents.get(session.sessionId);
     const jobs = ctx.get('jobs')?.list(session.sessionId).filter(job => job.owner === session.sessionId && (job.status === 'running' || job.status === 'stopping')) ?? [];
@@ -114,19 +119,19 @@ export function inventory(ctx, sessions, scan) {
       workspace: workspaceOf(session.sessionId)?.title ?? session.cwd ?? null,
       jobs: jobs.map(job => ({ id: job.id, label: job.label, status: job.status })),
       terminals: [
-        ...terminals.map(terminal => ({ id: terminal.sessionId, label: terminal.name ?? terminal.type, source: 'terminal', pid: terminal.pid ?? null })),
-        ...browser.map(terminal => ({ id: terminal.id, label: terminal.title, source: 'browser-terminal', pid: null })),
+        ...terminals.map(terminal => ({ id: terminal.sessionId, label: terminal.name ?? terminal.type, source: 'terminal' as const, pid: terminal.pid ?? null })),
+        ...browser.map(terminal => ({ id: terminal.id, label: terminal.title, source: 'browser-terminal' as const, pid: null })),
       ],
     });
     for (const terminal of terminals) if (terminal.pid) ownedPids.set(terminal.pid, session.sessionId);
     for (const job of jobs) {
       const root = job.processRoot;
-      if (!Number.isSafeInteger(root?.pid) || root.pid <= 0 || !/^\d{15,20}$/.test(root.started)) continue;
+      if (!root || !Number.isSafeInteger(root?.pid) || root.pid <= 0 || !/^\d{15,20}$/.test(root.started)) continue;
       const owner = { ...root, sessionId: session.sessionId, jobId: job.id, status: job.status };
       roots.set(root.pid, roots.has(root.pid) ? null : owner);
     }
   }
-  const grouped = new Map();
+  const grouped = new Map<number, Set<string>>();
   for (const listener of scan.listeners) {
     if (!Number.isSafeInteger(listener.pid) || !Number.isSafeInteger(listener.port)) continue;
     const ports = grouped.get(listener.pid) ?? new Set();
@@ -152,22 +157,24 @@ export function inventory(ctx, sessions, scan) {
   return { sessions: sessionRows, processes: rows, scannedAt: Date.now() };
 }
 
-async function stop(ctx, input) {
+async function stop(ctx: Context, raw: unknown) {
+  const input = raw && typeof raw === 'object' ? raw as Record<string, unknown> : undefined;
   if (!input || typeof input !== 'object' || typeof input.sessionId !== 'string' && input.kind !== 'process') throw new Error('Ungültiges Ziel');
-  const { kind, sessionId, id } = input;
+  const { kind, id } = input;
+  const sessionId = input.sessionId as SessionId;
   if (kind === 'job') {
     if (typeof id !== 'string' || !ctx.get('jobs')?.list(sessionId).some(job => job.owner === sessionId && job.id === id && job.status === 'running')) throw new Error('Job ist nicht mehr aktiv');
-    return ctx.get('jobs').kill(id, sessionId, 'Beendet im Task-Manager');
+    return ctx.get('jobs')!.kill(id as Parameters<Context['jobs']['kill']>[0], sessionId, 'Beendet im Task-Manager');
   }
   if (kind === 'terminal' || kind === 'browser-terminal') {
     const agent = ctx.agents.get(sessionId);
     if (!agent || typeof id !== 'string') throw new Error('Session ist nicht mehr aktiv');
     if (kind === 'terminal') {
       if (!ctx.get('terminals')?.list(agent).some(terminal => terminal.sessionId === id && terminal.status.kind === 'running')) throw new Error('Terminal ist nicht mehr aktiv');
-      await ctx.get('terminals').kill(agent, id, 'Beendet im Task-Manager');
+      await ctx.get('terminals')!.kill(agent, id as TerminalSessionId, 'Beendet im Task-Manager');
     } else {
       if (!ctx.get('terminalController')?.list(sessionId).some(terminal => terminal.id === id && terminal.state === 'running')) throw new Error('Terminal ist nicht mehr aktiv');
-      await ctx.get('terminalController').close(agent, id);
+      await ctx.get('terminalController')!.close(agent, id as WebTerminalId);
     }
     return 'Beendet';
   }
@@ -179,7 +186,7 @@ async function stop(ctx, input) {
   }
   if (kind === 'process') {
     const pid = input.pid;
-    if (!Number.isSafeInteger(pid) || pid <= 4 || typeof input.started !== 'string' || !/^\d{15,20}$/.test(input.started)) throw new Error('Ungültige Prozessidentität');
+    if (typeof pid !== 'number' || !Number.isSafeInteger(pid) || pid <= 4 || typeof input.started !== 'string' || !/^\d{15,20}$/.test(input.started)) throw new Error('Ungültige Prozessidentität');
     const scan = await scanWindows();
     const byPid = new Map(scan.processes.map(process => [process.pid, process]));
     const process = byPid.get(pid);
@@ -188,7 +195,7 @@ async function stop(ctx, input) {
     for (const agent of ctx.agents.list()) {
       const terminal = terminals?.list(agent).find(entry => entry.pid === pid && entry.status.kind === 'running');
       if (terminal) {
-        await terminals.kill(agent, terminal.sessionId, 'Beendet im Task-Manager');
+        await terminals!.kill(agent, terminal.sessionId, 'Beendet im Task-Manager');
         return 'Beendet';
       }
     }
@@ -200,7 +207,7 @@ async function stop(ctx, input) {
   throw new Error('Unbekannte Aktion');
 }
 
-export function apply(ctx) {
+export function apply(ctx: Context) {
   ctx.effect(() => ctx.connection.fetch.register({
     path: ROUTE, methods: ['GET', 'POST'], requestBody: 'buffered',
     async fetch(request) {
@@ -209,28 +216,29 @@ export function apply(ctx) {
           const admission = ctx.connection.admit(request);
           if ('rejection' in admission) return Response.json({ error: 'Betreiberzugriff erforderlich' }, { status: admission.rejection });
           if (admission.peer.id !== ctx.connection.operator.id) return Response.json({ error: 'Betreiberzugriff erforderlich' }, { status: 403 });
-          const input = await request.json();
-          if (['gateway-stop', 'gateway-extend', 'gateway-logs', 'gateway-prune'].includes(input?.kind)) {
+          const value: unknown = await request.json();
+          const input = value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
+          if (['gateway-stop', 'gateway-extend', 'gateway-logs', 'gateway-prune'].includes(typeof input?.kind === 'string' ? input.kind : '')) {
             const gateways = ctx.get('devGateways');
             if (!gateways) return Response.json({ error: 'Dev-Gateway-Dienst nicht verfügbar' }, { status: 503 });
-            if (typeof input.id !== 'string' || !input.id.trim()) throw new Error('Ungültige Gateway-ID');
+            if (!input || typeof input.id !== 'string' || !input.id.trim()) throw new Error('Ungültige Gateway-ID');
             const operator = { operator: true };
             let result;
             if (input.kind === 'gateway-stop') result = await gateways.stop(input.id, operator);
             if (input.kind === 'gateway-prune') result = await gateways.prune(input.id, operator);
             if (input.kind === 'gateway-extend') {
-              if (!Number.isSafeInteger(input.minutes) || input.minutes <= 0 || input.minutes > 480) throw new Error('Ungültige Verlängerung');
+              if (typeof input.minutes !== 'number' || !Number.isSafeInteger(input.minutes) || input.minutes <= 0 || input.minutes > 480) throw new Error('Ungültige Verlängerung');
               result = await gateways.extend(input.id, input.minutes, operator);
             }
             if (input.kind === 'gateway-logs') {
-              if (!Number.isSafeInteger(input.from) || input.from < 0) throw new Error('Ungültiger Log-Cursor');
+              if (typeof input.from !== 'number' || !Number.isSafeInteger(input.from) || input.from < 0) throw new Error('Ungültiger Log-Cursor');
               result = await gateways.logs(input.id, input.from, operator);
             }
             return Response.json({ result }, { headers: { 'cache-control': 'no-store' } });
           }
           return Response.json({ result: await stop(ctx, input) }, { headers: { 'cache-control': 'no-store' } });
         }
-        const sessions = [...(await ctx.sessionController.list({}, request.signal)).items];
+        const sessions: SessionSource[] = [...(await ctx.sessionController.list({}, request.signal)).items];
         const visible = new Set(sessions.map(session => session.sessionId));
         for (const agent of ctx.agents.list()) if (!visible.has(agent.id)) sessions.push({
           sessionId: agent.id, cwd: agent.session.header.cwd, running: agent.status === 'running',
@@ -238,10 +246,10 @@ export function apply(ctx) {
         const jobs = ctx.get('jobs');
         const rootPids = jobs ? sessions.flatMap(session => jobs.list(session.sessionId)
           .filter(job => job.owner === session.sessionId && ['running', 'stopping'].includes(job.status))
-          .map(job => job.processRoot?.pid).filter(pid => Number.isSafeInteger(pid) && pid > 0)) : [];
-        let scan = { processes: [], listeners: [] }, scanError = null;
+          .map(job => job.processRoot?.pid).filter((pid): pid is number => typeof pid === 'number' && Number.isSafeInteger(pid) && pid > 0)) : [];
+        let scan: ProcessScan = { processes: [], listeners: [] }, scanError: string | null = null;
         try { scan = await scanWindows(rootPids); } catch (error) { scanError = error instanceof Error ? error.message : String(error); }
-        let gateways = [], gatewayError = null;
+        let gateways: GatewayPublic[] = [], gatewayError: string | null = null;
         const service = ctx.get('devGateways');
         try {
           if (service) gateways = await service.list({ operator: true });

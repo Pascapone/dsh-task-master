@@ -1,7 +1,7 @@
 window.__ModuleLoader__.load({
   id: '@pascapone/dsh-task-master',
   factory(require) {
-    const React = require('react');
+    const React = require('react') as typeof import('react');
     const h = React.createElement;
     const URL = 'api/dsh-task-master';
     const CSS = `
@@ -66,19 +66,73 @@ window.__ModuleLoader__.load({
         extend: 'Verlängern', minutes: 'Minuten', expires: 'Läuft ab', gatewayStop: 'Diesen Dev-Server stoppen?', prune: 'Daten löschen', gatewayPrune: 'Temporäre Daten, Profil, Sessions und Logs dieses gestoppten Gateways unwiderruflich löschen?', gatewayFailed: 'Gateway-Aktion fehlgeschlagen.',
       },
     };
-    function Icon({ size, active }) {
+    function check(value: unknown): asserts value {
+      if (!value) throw new Error('Ungültige Task-Master-Antwort');
+    }
+    function record(value: unknown): Record<string, unknown> {
+      check(value && typeof value === 'object' && !Array.isArray(value));
+      return value as Record<string, unknown>;
+    }
+    function array(value: unknown): unknown[] { check(Array.isArray(value)); return value; }
+    const nullableText = (value: unknown) => value == null || typeof value === 'string';
+    const optionalText = (row: Record<string, unknown>, keys: string[]) => keys.every(key => row[key] === undefined || typeof row[key] === 'string');
+    const optionalBool = (row: Record<string, unknown>, keys: string[]) => keys.every(key => row[key] === undefined || typeof row[key] === 'boolean');
+    function checkInventory(value: unknown): asserts value is TaskMasterInventory {
+      const data = record(value);
+      check(typeof data.scannedAt === 'number' && Number.isFinite(new Date(data.scannedAt).valueOf()));
+      check(nullableText(data.scanError) && nullableText(data.gatewayError) && optionalBool(data, ['gatewayEnabled']));
+      for (const value of array(data.sessions)) {
+        const row = record(value);
+        check(typeof row.id === 'string' && nullableText(row.workspace));
+        check(['running', 'available', 'archived'].every(key => typeof row[key] === 'boolean'));
+        for (const value of array(row.jobs)) {
+          const job = record(value);
+          check(['id', 'label', 'status'].every(key => typeof job[key] === 'string'));
+        }
+        for (const value of array(row.terminals)) {
+          const terminal = record(value);
+          check(typeof terminal.id === 'string' && typeof terminal.label === 'string');
+          check(terminal.source === 'terminal' || terminal.source === 'browser-terminal');
+          check(terminal.pid === null || typeof terminal.pid === 'number' && Number.isSafeInteger(terminal.pid));
+        }
+      }
+      for (const value of array(data.processes)) {
+        const row = record(value);
+        check(typeof row.pid === 'number' && Number.isSafeInteger(row.pid) && typeof row.started === 'string' && typeof row.protected === 'boolean');
+        check(row.confidence === 'confirmed' || row.confidence === 'suspected' || row.confidence === 'unknown');
+        check(array(row.ports).every(value => typeof value === 'string'));
+        check(['name', 'sessionId', 'workspace', 'jobId', 'jobStatus'].every(key => nullableText(row[key])));
+      }
+      for (const value of data.gateways == null ? [] : array(data.gateways)) {
+        const row = record(value);
+        check(typeof row.id === 'string' && typeof row.status === 'string');
+        check(optionalText(row, ['label', 'workspace', 'ownerSessionId', 'url', 'startCommand', 'dataDir', 'cleanupError', 'reason']));
+        check(optionalBool(row, ['retainData', 'cleanupPending', 'cleanupOnArchive']));
+        check(row.kind === undefined || row.kind === 'project' || row.kind === 'dsh');
+        check(row.ownerKind === undefined || row.ownerKind === 'agent' || row.ownerKind === 'operator');
+        check(row.bundles === undefined || array(row.bundles).every(value => typeof value === 'string'));
+        check(row.expiresAt == null || typeof row.expiresAt === 'number' && Number.isFinite(row.expiresAt));
+      }
+    }
+    function checkLogs(value: unknown): asserts value is TaskMasterLogs {
+      const row = record(value);
+      check(typeof row.text === 'string' && typeof row.next === 'number' && Number.isSafeInteger(row.next) && row.next >= 0);
+      check(optionalBool(row, ['hasMore', 'lossy']));
+    }
+    function Icon({ size, active }: import('@deepseek-ai/dsh-client-ui-sidebar/client').SidebarPanelIconOwnerProps) {
       return h('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, style: { opacity: active ? 1 : .82 } },
         h('rect', { x: 3, y: 4, width: 18, height: 16, rx: 3 }),
         h('path', { d: 'M6.5 13h2.2l1.7-4 2.7 7 1.8-3h2.6' }));
     }
     return {
       inject: ['slots', 'locale'],
-      apply(ctx) {
-        ctx.effect(() => ctx.locale.register('@pascapone/dsh-task-master', dict), 'task-master: language');
+      apply(ctx: TaskMasterClientContext) {
+        // The SDK's bilingual overload fixes en/zh; its published runtime registers Object.entries.
+        ctx.effect(() => (ctx.locale.register as unknown as TaskMasterDictionaryRegistration)('@pascapone/dsh-task-master', dict), 'task-master: language');
         const t = ctx.locale.bind('@pascapone/dsh-task-master');
         function Panel() {
           React.useSyncExternalStore(cb => ctx.locale.subscribe(cb), () => ctx.locale.getSnapshot());
-          const [data, setData] = React.useState(null);
+          const [data, setData] = React.useState<TaskMasterInventory | null>(null);
           const [error, setError] = React.useState('');
           const [tab, setTab] = React.useState('sessions');
           const [sessionStatus, setSessionStatus] = React.useState('all');
@@ -87,65 +141,69 @@ window.__ModuleLoader__.load({
           const [query, setQuery] = React.useState('');
           const [ownership, setOwnership] = React.useState('all');
           const [busy, setBusy] = React.useState('');
-          const [minutes, setMinutes] = React.useState(30);
-          const [gatewayLogs, setGatewayLogs] = React.useState(null);
-          const currentRequest = React.useRef(null);
-          const followupTimer = React.useRef(null);
+          const [minutes, setMinutes] = React.useState<number | string>(30);
+          const [gatewayLogs, setGatewayLogs] = React.useState<(TaskMasterLogs & { id: string; from: number }) | null>(null);
+          const currentRequest = React.useRef<AbortController | null>(null);
+          const followupTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
           const refresh = React.useCallback(async (signal = currentRequest.current?.signal) => {
             try {
               const response = await fetch(URL, { signal });
               if (!response.ok) throw new Error(`HTTP ${response.status}`);
-              const result = await response.json();
-              if (!signal?.aborted) { setData(result); setError(''); }
-            } catch (failure) { if (!signal?.aborted) setError(failure.message); }
+              const result: unknown = await response.json();
+              if (!signal?.aborted) { checkInventory(result); setData(result); setError(''); }
+            } catch (failure) { if (!signal?.aborted) setError((failure as Error).message); }
           }, []);
           React.useEffect(() => {
             const controller = new AbortController();
             currentRequest.current = controller;
             refresh(controller.signal);
             const timer = setInterval(() => { if (!document.hidden) refresh(controller.signal); }, 8000);
-            return () => { controller.abort(); clearInterval(timer); clearTimeout(followupTimer.current); currentRequest.current = null; };
+            return () => { controller.abort(); clearInterval(timer); clearTimeout(followupTimer.current!); currentRequest.current = null; };
           }, [refresh]);
-          async function post(target) {
+          async function post(target: TaskMasterTarget | TaskMasterGatewayTarget): Promise<unknown> {
             const response = await fetch(URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(target) });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error ?? `HTTP ${response.status}`);
+            const value: unknown = await response.json();
+            const result = record(value);
+            if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : `HTTP ${response.status}`);
             return result.result;
           }
-          async function stop(target, key) {
+          async function stop(target: TaskMasterTarget, key: string) {
             if (!window.confirm(target.kind === 'process' ? t('ask') : t('askOwned'))) return;
             setBusy(key);
             try {
               await post(target);
               await refresh();
-              clearTimeout(followupTimer.current);
+              clearTimeout(followupTimer.current!);
               followupTimer.current = setTimeout(() => refresh(), 1200);
-            } catch (failure) { setError(`${t('failed')} ${failure.message}`); }
+            } catch (failure) { setError(`${t('failed')} ${(failure as Error).message}`); }
             finally { setBusy(''); }
           }
-          async function gatewayAction(kind, id, from = 0) {
-            if (['gateway-stop', 'gateway-extend'].includes(kind) && !['starting', 'ready'].includes(data?.gateways?.find(item => item.id === id)?.status)) return;
+          async function gatewayAction(kind: TaskMasterGatewayAction, id: string, from = 0) {
+            if (['gateway-stop', 'gateway-extend'].includes(kind) && !['starting', 'ready'].includes(data?.gateways?.find(item => item.id === id)?.status!)) return;
             if (kind === 'gateway-stop' && !window.confirm(t('gatewayStop'))) return;
             if (kind === 'gateway-prune' && !window.confirm(t('gatewayPrune'))) return;
             if (kind === 'gateway-extend' && (!Number.isSafeInteger(Number(minutes)) || Number(minutes) <= 0 || Number(minutes) > 480)) return;
             setBusy(`${kind}:${id}`);
             try {
               const result = await post({ kind, id, ...(kind === 'gateway-extend' ? { minutes: Number(minutes) } : {}), ...(kind === 'gateway-logs' ? { from } : {}) });
-              if (kind === 'gateway-logs') setGatewayLogs(previous => ({ id, text: (previous?.id === id && from !== 0 ? previous.text : '') + result.text, next: result.next, hasMore: result.hasMore ?? result.next > from, lossy: !!result.lossy || !!(previous?.id === id && from !== 0 && previous.lossy), from }));
+              if (kind === 'gateway-logs') {
+                checkLogs(result);
+                setGatewayLogs(previous => ({ id, text: (previous?.id === id && from !== 0 ? previous.text : '') + result.text, next: result.next, hasMore: result.hasMore ?? result.next > from, lossy: !!result.lossy || !!(previous?.id === id && from !== 0 && previous.lossy), from }));
+              }
               else { setGatewayLogs(previous => kind === 'gateway-stop' && previous?.id === id ? null : previous); await refresh(); }
               setError('');
-            } catch (failure) { setError(`${t('gatewayFailed')} ${failure.message}`); }
+            } catch (failure) { setError(`${t('gatewayFailed')} ${(failure as Error).message}`); }
             finally { setBusy(''); }
           }
-          function switchTab(event, next) {
+          function switchTab(event: import('react').KeyboardEvent<HTMLElement>, next: string) {
             const ids = ['sessions', 'processes', 'gateways'];
             if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
             event.preventDefault();
             const index = ids.indexOf(next);
             const target = event.key === 'Home' ? ids[0] : event.key === 'End' ? ids.at(-1)
               : ids[(index + (event.key === 'ArrowRight' ? 1 : ids.length - 1)) % ids.length];
-            setTab(target);
-            event.currentTarget.parentElement.querySelector(`[data-task-master-tab="${target}"]`)?.focus();
+            setTab(target!);
+            event.currentTarget.parentElement!.querySelector<HTMLButtonElement>(`[data-task-master-tab="${target}"]`)?.focus();
           }
           const sessions = data?.sessions ?? [];
           const processes = data?.processes ?? [];
@@ -159,22 +217,22 @@ window.__ModuleLoader__.load({
             (!withTasks || item.running || item.jobs.length + item.terminals.length > 0) &&
             (!normalized || `${item.workspace ?? ''} ${item.id}`.toLocaleLowerCase().includes(normalized)));
           const shownProcesses = ownership === 'all' ? processes : processes.filter(item => item.confidence === ownership);
-          const tabButton = (id, label, count) => h('button', {
+          const tabButton = (id: string, label: string, count: number) => h('button', {
             type: 'button', role: 'tab', id: `dtm-tab-${id}`, key: id, 'data-task-master-tab': id,
             'aria-controls': `dtm-panel-${id}`, 'aria-selected': tab === id,
             tabIndex: tab === id ? 0 : -1, className: 'dtm-tab', onClick: () => setTab(id),
             onKeyDown: event => switchTab(event, id),
           }, label, h('span', { className: 'dtm-tab-count' }, count));
-          const chip = (value, selected, choose, label, count) => h('button', {
+          const chip = (value: string, selected: string, choose: (value: string) => void, label: string, count?: number) => h('button', {
             key: value, type: 'button', className: 'dtm-chip', 'aria-pressed': selected === value, onClick: () => choose(value),
           }, label, count === undefined ? null : h('span', { className: 'dtm-chip-count' }, ` ${count}`));
-          const stopButton = (target, key, disabled, label, disabledLabel = t('protected')) => h('button', {
+          const stopButton = (target: TaskMasterTarget, key: string, disabled: boolean | string | null | undefined, label: string, disabledLabel = t('protected')) => h('button', {
             type: 'button', className: 'dtm-stop' + (target.kind === 'process' ? ' danger' : ''),
             disabled: disabled || !!busy, title: disabled ? disabledLabel : label,
             'aria-label': disabled ? `${disabledLabel}: ${label}` : label,
             onClick: () => stop(target, key),
           }, disabled ? disabledLabel : busy === key ? t('stopping') : t('stop'));
-          const status = (kind, label) => h('span', { className: `dtm-state ${kind}` }, label);
+          const status = (kind: string, label: string) => h('span', { className: `dtm-state ${kind}` }, label);
           return h('div', { className: 'dtm' }, h('style', null, CSS),
             h('header', { className: 'dtm-head' },
               h('div', { className: 'dtm-toolbar' },
@@ -188,7 +246,7 @@ window.__ModuleLoader__.load({
               h('div', { className: 'dtm-controls' },
                 h('input', { type: 'search', className: 'dtm-search', value: query, onChange: event => setQuery(event.target.value), placeholder: t('search'), 'aria-label': t('search') }),
                 h('div', { className: 'dtm-segment', role: 'group', 'aria-label': t('sessionFilters'), title: t('sessionFilters') },
-                  ['all', 'running', 'idle', 'inactive'].map(value => chip(value, sessionStatus, setSessionStatus, t(value)))),
+                  (['all', 'running', 'idle', 'inactive'] as const).map(value => chip(value, sessionStatus, setSessionStatus, t(value)))),
                 h('label', { className: 'dtm-check' }, h('input', { type: 'checkbox', checked: withTasks, onChange: event => setWithTasks(event.target.checked) }), t('withTasks')),
                 h('label', { className: 'dtm-check' }, h('input', { type: 'checkbox', checked: showArchived, onChange: event => setShowArchived(event.target.checked) }), t('showArchived'),
                   h('span', { className: 'dtm-chip-count' }, sessions.filter(item => item.archived).length)),
@@ -218,7 +276,7 @@ window.__ModuleLoader__.load({
             h('section', { id: 'dtm-panel-processes', role: 'tabpanel', 'aria-labelledby': 'dtm-tab-processes', className: 'dtm-panel', hidden: tab !== 'processes', tabIndex: 0 },
               h('div', { className: 'dtm-controls' },
                 h('div', { className: 'dtm-segment', role: 'group', 'aria-label': t('processFilters') },
-                  ['all', 'confirmed', 'suspected', 'unknown'].map(value => chip(value, ownership, setOwnership, t(value), value === 'all' ? processes.length : processes.filter(item => item.confidence === value).length))),
+                  (['all', 'confirmed', 'suspected', 'unknown'] as const).map(value => chip(value, ownership, setOwnership, t(value), value === 'all' ? processes.length : processes.filter(item => item.confidence === value).length))),
                 h('span', { className: 'dtm-filter-count', 'aria-live': 'polite' }, `${shownProcesses.length} / ${processes.length}`)),
               error && h('div', { className: 'dtm-notice error', role: 'alert' }, t('loadError'), ' ', error),
               data?.scanError && h('div', { className: 'dtm-notice error', role: 'alert' }, t('scanError'), ': ', data.scanError),

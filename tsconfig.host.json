@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false, "allowImportingTsExtensions": false,
+    "rootDir": ".", "outDir": "lib", "declaration": true, "noEmitOnError": true
+  },
+  "include": ["index.ts", "host-types.ts", "wire.ts", "scan.ts"]
+}
